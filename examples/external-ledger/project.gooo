@@ -1,0 +1,29 @@
+package externalledger
+namespace externalledger
+
+entity ProjectAuthority id "gooo://external-ledger/entity/project-authority"
+entity SourceSnapshot id "gooo://external-ledger/entity/source-snapshot"
+entity ProjectInventory id "gooo://external-ledger/entity/project-inventory"
+entity LanguageLines id "gooo://external-ledger/entity/language-lines"
+entity BuildEntrypoint id "gooo://external-ledger/entity/build-entrypoint"
+entity ProjectDocumentation id "gooo://external-ledger/entity/project-documentation"
+entity OperationsRunbook id "gooo://external-ledger/entity/operations-runbook"
+entity ReleaseNotes id "gooo://external-ledger/entity/release-notes"
+entity ReleasedGoooSemantics id "gooo://external-ledger/entity/released-gooo-semantics"
+entity ResourceUsage id "gooo://external-ledger/entity/resource-usage"
+entity ReadOnlyEffect id "gooo://external-ledger/entity/read-only-effect"
+entity ReleaseDecision id "gooo://external-ledger/entity/release-decision"
+entity EvidenceDecision id "gooo://external-ledger/entity/evidence-decision"
+
+activity DeclareProjectAuthority(ProjectAuthority) -> EvidenceDecision
+activity ObserveSourceSnapshot(SourceSnapshot) -> EvidenceDecision
+activity CountProjectInventory(ProjectInventory) -> EvidenceDecision
+activity CountLanguageLines(LanguageLines) -> EvidenceDecision
+activity ObserveBuildEntrypoint(BuildEntrypoint) -> EvidenceDecision
+activity ObserveProjectDocumentation(ProjectDocumentation) -> EvidenceDecision
+activity ObserveOperationsRunbook(OperationsRunbook) -> EvidenceDecision
+activity ObserveReleaseNotes(ReleaseNotes) -> EvidenceDecision
+activity BindReleasedGoooSemantics(ReleasedGoooSemantics) -> EvidenceDecision
+activity ObserveResourceUsage(ResourceUsage) -> EvidenceDecision
+activity ObserveReadOnlyEffect(ReadOnlyEffect) -> EvidenceDecision
+activity CloseReleaseDecision(ReleaseDecision) -> EvidenceDecision

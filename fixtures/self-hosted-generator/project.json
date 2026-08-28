@@ -1,7 +1,8 @@
 {
-  "schema": "gooo/evidence-generator/project/v1",
+  "schema": "gooo/evidence-generator/project/v2",
   "id": "gooo://project/self-hosted-evidence-generator/v1",
   "name": "self-hosted-evidence-generator",
+  "graph_roles": {"promotion": "meta_graph", "cells": "project_graph"},
   "expected_output_files": 7,
   "required_patterns": [
     "released-core-lock",
@@ -30,6 +31,7 @@
     {"id": "complete", "expected_decision": "PROJECT_GENERATED", "closed": 12, "unknown": 0, "refuted": 0},
     {"id": "missing-publish-activity", "expected_decision": "INCOMPLETE", "closed": 9, "unknown": 3, "refuted": 0},
     {"id": "duplicate-publish-activity", "expected_decision": "FAIL_CLOSED", "closed": 9, "unknown": 0, "refuted": 3},
+    {"id": "missing-meta-publish-activity", "expected_decision": "INCOMPLETE", "closed": 12, "unknown_required_patterns": 1},
     {"id": "unbound-required-pattern", "expected_decision": "FAIL_CLOSED", "missing_required_patterns": 1},
     {"id": "generated-file-drift", "expected_decision": "FAIL_CLOSED", "verified": 5, "refuted": 1}
   ]

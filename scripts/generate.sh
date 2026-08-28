@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 8 ]; then
-  echo "usage: generate.sh REPOSITORY GRAPH DENOMINATOR OBSERVATION PROFILE OUTPUT SUBJECT_SHA SCENARIO" >&2
+if [ "$#" -ne 9 ]; then
+  echo "usage: generate.sh REPOSITORY META_GRAPH PROJECT_GRAPH DENOMINATOR OBSERVATION PROFILE OUTPUT SUBJECT_SHA SCENARIO" >&2
   exit 64
 fi
 
 repository=$1
-graph=$2
-denominator=$3
-observation=$4
-profile=$5
-output_arg=$6
-subject_sha=$7
-scenario=$8
+meta_graph=$2
+project_graph=$3
+denominator=$4
+observation=$5
+profile=$6
+output_arg=$7
+subject_sha=$8
+scenario=$9
 
 repository_real=$(realpath "$repository")
 output_real=$(realpath -m "$output_arg")
@@ -51,14 +52,16 @@ jq -e '
 ' "$observation" >/dev/null
 
 jq -e '
-  .schema == "gooo/evidence-generator/project/v1" and
+  .schema == "gooo/evidence-generator/project/v2" and
+  .graph_roles == {promotion:"meta_graph",cells:"project_graph"} and
   .expected_output_files == 7 and
   ((.required_patterns | unique | length) == (.required_patterns | length)) and
   ((.conformance_checks | length) == 8) and
-  ((.scenarios | length) == 5)
+  ((.scenarios | length) == 6)
 ' "$profile" >/dev/null
 
-jq -e '.schema_version == "gooo-graph/v1" and (.nodes | type) == "array"' "$graph" >/dev/null
+jq -e '.schema_version == "gooo-graph/v1" and (.nodes | type) == "array"' "$meta_graph" >/dev/null
+jq -e '.schema_version == "gooo-graph/v1" and (.nodes | type) == "array"' "$project_graph" >/dev/null
 jq -e '.schema == "gooo/core-release-lock/v1" and (.assets | length) == 1' "$repository/contracts/core-release-lock-v1.json" >/dev/null
 
 mkdir -p \
@@ -71,23 +74,29 @@ jq -S . "$repository/contracts/core-release-lock-v1.json" > "$output_real/contra
 jq -S . "$denominator" > "$output_real/contracts/evidence-denominator-v1.json"
 
 jq -S -n \
-  --slurpfile graph "$graph" \
+  --slurpfile meta_graph "$meta_graph" \
+  --slurpfile project_graph "$project_graph" \
   --slurpfile denominator "$denominator" \
   --slurpfile observation "$observation" \
   --slurpfile profile "$profile" \
   --arg subject_sha "$subject_sha" \
   --arg scenario "$scenario" '
-  ($graph[0]) as $g |
+  ($meta_graph[0]) as $meta |
+  ($project_graph[0]) as $project |
   ($denominator[0]) as $d |
   ($observation[0]) as $o |
   ($profile[0]) as $p |
-  def occurrences($name):
+  def meta_occurrences($name):
     if $name == null then 0
-    else ([$g.nodes[]? | select(.kind == "Activity" and .name == $name)] | length)
+    else ([$meta.nodes[]? | select(.kind == "Activity" and .name == $name)] | length)
+    end;
+  def project_occurrences($name):
+    if $name == null then 0
+    else ([$project.nodes[]? | select(.kind == "Activity" and .name == $name)] | length)
     end;
   ([$o.patterns[] |
     . as $pattern |
-    (occurrences($pattern.meta_activity)) as $activity_occurrences |
+    (meta_occurrences($pattern.meta_activity)) as $activity_occurrences |
     ($pattern.support_count >= $o.promotion_threshold) as $support_eligible |
     ($pattern.meta_activity != null and $activity_occurrences == 1) as $meta_bound |
     {
@@ -116,7 +125,7 @@ jq -S -n \
   (reduce $d.cells[] as $cell
     ({cells: [], decisions: {}};
       . as $acc |
-      (occurrences($cell.activity)) as $activity_occurrences |
+      (project_occurrences($cell.activity)) as $activity_occurrences |
       ([$cell.depends_on[]? | $acc.decisions[.]]) as $dependencies |
       (if $activity_occurrences == 0 then
         {cell_id: $cell.id, state: "UNKNOWN", reason: $cell.unknown_reason,
@@ -147,7 +156,7 @@ jq -S -n \
   ([$evaluation.cells[] | select(.unknown_class == "DEPENDENCY_BLOCKED")] | length) as $dependency_blocked |
   ([$evaluation.cells[] | select(.state != "CLOSED")][0] // null) as $first_nonclosed |
   {
-    schema: "gooo/evidence-generator/report/v1",
+    schema: "gooo/evidence-generator/report/v2",
     decision: (if ($refuted_required | length) > 0 or $refuted > 0 then "FAIL_CLOSED"
       elif ($unknown_required | length) > 0 or $unknown > 0 then "INCOMPLETE"
       else "PROJECT_GENERATED" end),
@@ -155,11 +164,15 @@ jq -S -n \
     subject: {
       sha: $subject_sha,
       project_id: $p.id,
-      graph_hash: $g.graph_hash,
-      source_digest: $g.source_digest
+      meta_graph_hash: $meta.graph_hash,
+      meta_source_digest: $meta.source_digest,
+      project_graph_hash: $project.graph_hash,
+      project_source_digest: $project.source_digest
     },
     authority: {
       activity_binding: "RELEASED_GOOO_GRAPH_ACTIVITY_SET",
+      pattern_activity_binding: "META_GRAPH",
+      cell_activity_binding: "PROJECT_GRAPH",
       pattern_observation: $o.id,
       promotion_rule: "SUPPORT_AT_LEAST_3_OF_4_AND_EXACTLY_ONE_META_ACTIVITY",
       root_readme_readiness: "EXCLUDED",
@@ -188,7 +201,8 @@ jq -S -n \
       refuted: $refuted,
       direct_missing: $direct_missing,
       dependency_blocked: $dependency_blocked,
-      activity_nodes: ([$g.nodes[]? | select(.kind == "Activity")] | length),
+      meta_activity_nodes: ([$meta.nodes[]? | select(.kind == "Activity")] | length),
+      project_activity_nodes: ([$project.nodes[]? | select(.kind == "Activity")] | length),
       expected_output_files: $p.expected_output_files
     },
     proofs: [$d.proof_totals[] as $proof | {
@@ -229,9 +243,9 @@ jq -S -n \
 
 jq -S -n \
   --slurpfile report "$output_real/generation-report.json" \
-  --slurpfile graph "$graph" '
+  --slurpfile project_graph "$project_graph" '
   {
-    schema: "gooo/evidence-generator/activity-bindings/v1",
+    schema: "gooo/evidence-generator/activity-bindings/v2",
     subject: $report[0].subject,
     binding_authority: $report[0].authority.activity_binding,
     bindings: [$report[0].cells[] as $cell | {
@@ -239,17 +253,17 @@ jq -S -n \
       cell_id: $cell.id,
       activity: $cell.activity,
       state: $cell.state,
-      graph_node_ids: [$graph[0].nodes[]? |
+      graph_node_ids: [$project_graph[0].nodes[]? |
         select(.kind == "Activity" and .name == $cell.activity) | .id]
     }]
   }
-' > "$output_real/meta/activity-bindings-v1.json"
+' > "$output_real/meta/activity-bindings-v2.json"
 
 jq -S -n \
   --slurpfile report "$output_real/generation-report.json" \
   --slurpfile profile "$profile" '
   {
-    schema: "gooo/evidence-generator/conformance-plan/v1",
+    schema: "gooo/evidence-generator/conformance-plan/v2",
     subject: $report[0].subject,
     executable: false,
     promoted_patterns: [$report[0].patterns.items[] | select(.promoted) |
@@ -257,7 +271,7 @@ jq -S -n \
     checks: $profile[0].conformance_checks,
     scenarios: $profile[0].scenarios
   }
-' > "$output_real/conformance/plan-v1.json"
+' > "$output_real/conformance/plan-v2.json"
 
 project_name=$(jq -r '.name' "$profile")
 decision=$(jq -r '.decision' "$output_real/generation-report.json")
@@ -284,8 +298,8 @@ EOF
 tracked_files=(
   contracts/core-release-lock-v1.json
   contracts/evidence-denominator-v1.json
-  meta/activity-bindings-v1.json
-  conformance/plan-v1.json
+  meta/activity-bindings-v2.json
+  conformance/plan-v2.json
   docs/evidence-contract.md
   generation-report.json
 )
@@ -302,7 +316,7 @@ jq -S -n \
   --arg scenario "$scenario" \
   --argjson files "$entries" '
   {
-    schema: "gooo/evidence-generator/manifest/v1",
+    schema: "gooo/evidence-generator/manifest/v2",
     subject_sha: $subject_sha,
     scenario: $scenario,
     tracked_file_count: ($files | length),

@@ -55,3 +55,23 @@ projects therefore cannot block the source projects that informed the pattern.
 
 See [the v1 RFC](docs/rfcs/evidence-generator-v1.md) for the authority and
 non-claim boundaries.
+
+## Dual-graph v2
+
+V1 deliberately proved self-hosting with one graph. That graph carried two
+different authorities: generator-pattern promotion and consumer-cell binding.
+V2 separates them:
+
+- `meta graph` decides whether recurring generator patterns have exactly one
+  Gooo meta-activity;
+- `project graph` decides whether a consumer denominator has exactly one Gooo
+  activity per cell;
+- deleting a project activity cannot demote a generator pattern;
+- deleting a meta activity cannot alter a consumer cell;
+- both graph identities are preserved in every generated report.
+
+CI also generates an external local-project ledger fixture with the unchanged
+generator. This captured fixture is evidence for graph separation, not one of
+the required two independent public consumer adoptions.
+
+See [the v2 RFC](docs/rfcs/separate-meta-project-graphs-v2.md).
