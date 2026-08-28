@@ -1,0 +1,29 @@
+package evidencegenerator
+namespace evidencegenerator
+
+entity ReleasedGoooIdentity id "gooo://evidence-generator/entity/released-gooo"
+entity PatternObservation id "gooo://evidence-generator/entity/pattern-observation"
+entity PromotionPolicy id "gooo://evidence-generator/entity/promotion-policy"
+entity GeneratedProjectAuthority id "gooo://evidence-generator/entity/project-authority"
+entity GeneratedDenominator id "gooo://evidence-generator/entity/generated-denominator"
+entity GeneratedActivityBindings id "gooo://evidence-generator/entity/activity-bindings"
+entity GeneratedConformancePlan id "gooo://evidence-generator/entity/conformance-plan"
+entity GenerationReceipt id "gooo://evidence-generator/entity/generation-receipt"
+entity ReplayObservation id "gooo://evidence-generator/entity/replay-observation"
+entity ReadOnlyObservation id "gooo://evidence-generator/entity/read-only-observation"
+entity UnknownTrace id "gooo://evidence-generator/entity/unknown-trace"
+entity RefutationTrace id "gooo://evidence-generator/entity/refutation-trace"
+entity EvidenceDecision id "gooo://evidence-generator/entity/evidence-decision"
+
+activity ObserveReleasedGoooIdentity(ReleasedGoooIdentity) -> EvidenceDecision
+activity ObservePatternSupport(PatternObservation) -> EvidenceDecision
+activity ApplyPromotionThreshold(PromotionPolicy) -> EvidenceDecision
+activity DeclareGeneratedProjectAuthority(GeneratedProjectAuthority) -> EvidenceDecision
+activity GenerateDenominator(GeneratedDenominator) -> EvidenceDecision
+activity BindGeneratedActivities(GeneratedActivityBindings) -> EvidenceDecision
+activity GenerateConformancePlan(GeneratedConformancePlan) -> EvidenceDecision
+activity PublishGenerationReceipt(GenerationReceipt) -> EvidenceDecision
+activity ObserveDeterministicReplay(ReplayObservation) -> EvidenceDecision
+activity ObserveZeroSourceWrite(ReadOnlyObservation) -> EvidenceDecision
+activity PreserveUnknownTrace(UnknownTrace) -> EvidenceDecision
+activity PreserveRefutationTrace(RefutationTrace) -> EvidenceDecision

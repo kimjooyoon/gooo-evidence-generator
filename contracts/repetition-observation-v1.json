@@ -1,0 +1,118 @@
+{
+  "schema": "gooo/evidence-generator/repetition-observation/v1",
+  "id": "gooo://observation/four-public-evidence-projects/v1",
+  "observed_projects": 4,
+  "promotion_threshold": 3,
+  "sources": [
+    {
+      "ordinal": 1,
+      "repository": "kimjooyoon/gooo-design-evidence",
+      "main_sha": "3eedfce13bf9160cb39b110b051d92744c2a6327",
+      "release": "v0.1.0-dev"
+    },
+    {
+      "ordinal": 2,
+      "repository": "kimjooyoon/gooo-workgraph",
+      "main_sha": "c18a75881b75b8499179bda403a4f590562c7a25",
+      "release": "v0.1.0-dev"
+    },
+    {
+      "ordinal": 3,
+      "repository": "kimjooyoon/gooo-local-ledger",
+      "main_sha": "e2a7e7a857f28cf40e0460f9079463ecc4f98da5",
+      "release": "v0.1.0-dev"
+    },
+    {
+      "ordinal": 4,
+      "repository": "kimjooyoon/gooo-infra-evidence",
+      "main_sha": "f6d184f3d18151019c03ee1210b712b825bffad9",
+      "release": "v0.1.0-dev"
+    }
+  ],
+  "patterns": [
+    {
+      "id": "released-core-lock",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "ObserveReleasedGoooIdentity",
+      "generator_role": "COPY_PINNED_RELEASE_LOCK"
+    },
+    {
+      "id": "fixed-denominator",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "GenerateDenominator",
+      "generator_role": "GENERATE_FIXED_DENOMINATOR"
+    },
+    {
+      "id": "gooo-activity-model",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "BindGeneratedActivities",
+      "generator_role": "BIND_RELEASED_GRAPH_ACTIVITIES"
+    },
+    {
+      "id": "evaluator-contract",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "GenerateConformancePlan",
+      "generator_role": "DECLARE_EVALUATION_STEPS"
+    },
+    {
+      "id": "ci-evidence-artifact",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "PublishGenerationReceipt",
+      "generator_role": "DECLARE_CI_EVIDENCE_OUTPUT"
+    },
+    {
+      "id": "contract-rfc",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "DeclareGeneratedProjectAuthority",
+      "generator_role": "GENERATE_AUTHORITY_DOCUMENT"
+    },
+    {
+      "id": "deterministic-replay",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "ObserveDeterministicReplay",
+      "generator_role": "REQUIRE_BYTE_IDENTICAL_REPLAY"
+    },
+    {
+      "id": "zero-source-write",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "ObserveZeroSourceWrite",
+      "generator_role": "REQUIRE_EXTERNAL_OUTPUT_DIRECTORY"
+    },
+    {
+      "id": "explicit-unknown",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "PreserveUnknownTrace",
+      "generator_role": "REQUIRE_UNKNOWN_SCENARIO"
+    },
+    {
+      "id": "explicit-refutation",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": "PreserveRefutationTrace",
+      "generator_role": "REQUIRE_REFUTATION_SCENARIO"
+    },
+    {
+      "id": "fixture-bundle",
+      "support_count": 3,
+      "source_indices": [1, 3, 4],
+      "meta_activity": "ObservePatternSupport",
+      "generator_role": "DECLARE_CAPTURED_FIXTURE_BOUNDARY"
+    },
+    {
+      "id": "root-readme",
+      "support_count": 4,
+      "source_indices": [1, 2, 3, 4],
+      "meta_activity": null,
+      "generator_role": "OPTIONAL_DOCUMENTATION_ONLY"
+    }
+  ]
+}
