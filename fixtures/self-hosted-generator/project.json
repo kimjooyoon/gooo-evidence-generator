@@ -19,7 +19,7 @@
   ],
   "conformance_checks": [
     {"ordinal": 1, "id": "RELEASE_IDENTITY", "expected": "PINNED_RELEASE_OBSERVED"},
-    {"ordinal": 2, "id": "ACTIVITY_SET", "expected": "ACTIVITY_BINDINGS_EQUAL_DENOMINATOR"},
+    {"ordinal": 2, "id": "ACTIVITY_SET", "expected": "CORE_RESOLUTION_RECEIPTS_EQUAL_DENOMINATOR"},
     {"ordinal": 3, "id": "FIXED_DENOMINATOR", "expected": "DECLARED_TOTAL_EQUALS_CELL_COUNT"},
     {"ordinal": 4, "id": "DETERMINISTIC_REPLAY", "expected": "BYTE_IDENTICAL_OUTPUT"},
     {"ordinal": 5, "id": "ZERO_SOURCE_WRITE", "expected": "SOURCE_REPOSITORY_WRITES_ZERO"},
@@ -30,9 +30,12 @@
   "scenarios": [
     {"id": "complete", "expected_decision": "PROJECT_GENERATED", "closed": 12, "unknown": 0, "refuted": 0},
     {"id": "missing-publish-activity", "expected_decision": "INCOMPLETE", "closed": 9, "unknown": 3, "refuted": 0},
-    {"id": "duplicate-publish-activity", "expected_decision": "FAIL_CLOSED", "closed": 9, "unknown": 0, "refuted": 3},
+    {"id": "ambiguous-publish-selector", "expected_decision": "FAIL_CLOSED", "closed": 9, "unknown": 0, "refuted": 3},
     {"id": "missing-meta-publish-activity", "expected_decision": "INCOMPLETE", "closed": 12, "unknown_required_patterns": 1},
     {"id": "unbound-required-pattern", "expected_decision": "FAIL_CLOSED", "missing_required_patterns": 1},
-    {"id": "generated-file-drift", "expected_decision": "FAIL_CLOSED", "verified": 5, "refuted": 1}
+    {"id": "generated-file-drift", "expected_decision": "FAIL_CLOSED", "verified": 5, "refuted": 1},
+    {"id": "missing-core-resolution-receipt", "expected_decision": "INCOMPLETE", "closed": 9, "unknown": 3},
+    {"id": "invalid-core-resolution-decision", "expected_decision": "FAIL_CLOSED", "closed": 9, "refuted": 3},
+    {"id": "core-resolution-identity-mismatch", "expected_decision": "FAIL_CLOSED"}
   ]
 }
