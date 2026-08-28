@@ -126,6 +126,7 @@ jq -S -n \
   ($observation[0]) as $o |
   ($profile[0]) as $p |
   ($meta.activity_resolution_observation.core_release==$project.activity_resolution_observation.core_release) as $core_identity_match |
+  ([$d.cells[] | select(.core_identity_anchor == true)] | length) as $core_identity_anchor_count |
   def resolution_for($graph;$id;$activity):
     ([$graph.activity_resolution_observation.entries[]? |
       select(.id==$id and .activity==$activity)]) as $entries |
@@ -203,7 +204,9 @@ jq -S -n \
       (resolution_for($project;$cell.id;$cell.activity)) as $resolution |
       ($resolution.occurrences) as $activity_occurrences |
       ([$cell.depends_on[]? | $acc.decisions[.]]) as $dependencies |
-      (if $cell.id=="RELEASED_GOOO_IDENTITY" and ($core_identity_match|not) then
+      (if $core_identity_anchor_count != 1 then
+        {cell_id:$cell.id,state:"REFUTED",stage:"DENOMINATOR",step:"SELECT_CORE_IDENTITY_ANCHOR",reason:"CORE_IDENTITY_ANCHOR_CARDINALITY_INVALID",next_operation:"DECLARE_EXACTLY_ONE_CORE_IDENTITY_ANCHOR",unknown_class:null,blocked_by:[]}
+      elif $cell.core_identity_anchor == true and ($core_identity_match|not) then
         {cell_id:$cell.id,state:"REFUTED",stage:"CORE_RELEASE",step:"BIND_CORE_RESOLUTION_RELEASE_IDENTITY",reason:"CORE_RESOLUTION_RELEASE_IDENTITY_MISMATCH",next_operation:"RESTORE_COMMON_CORE_RESOLUTION_RELEASE",unknown_class:null,blocked_by:[]}
       elif $resolution.state == "UNKNOWN" then
         ({cell_id:$cell.id,state:"UNKNOWN",reason:(if $resolution.reason=="ACTIVITY_NOT_FOUND" then $cell.unknown_reason else $resolution.reason end),
@@ -264,6 +267,7 @@ jq -S -n \
       schema:"gooo/activity-cardinality-resolution/v1",
       core_release:$project.activity_resolution_observation.core_release,
       identity_match:$core_identity_match,
+      identity_anchor_count:$core_identity_anchor_count,
       meta:{required:([$patterns[]|select(.meta_activity!=null)]|length),closed:([$patterns[]|select(.meta_activity!=null and .core_resolution.state=="CLOSED")]|length),unknown:([$patterns[]|select(.meta_activity!=null and .core_resolution.state=="UNKNOWN")]|length),refuted:([$patterns[]|select(.meta_activity!=null and .core_resolution.state=="REFUTED")]|length)},
       project:{required:$d.target_cells,closed:([$evaluation.cells[].core_resolution|select(.state=="CLOSED")]|length),unknown:([$evaluation.cells[].core_resolution|select(.state=="UNKNOWN")]|length),refuted:([$evaluation.cells[].core_resolution|select(.state=="REFUTED")]|length)}
     },
@@ -311,7 +315,11 @@ jq -S -n \
       {id:"gooo.metric.generator.core-resolution-receipts.v1",value:(([$patterns[]|select(.meta_activity!=null and .core_resolution.state=="CLOSED")]|length)+([$evaluation.cells[].core_resolution|select(.state=="CLOSED")]|length)),total:(([$patterns[]|select(.meta_activity!=null)]|length)+$d.target_cells),unit:"receipts"}
     ],
     cells: $evaluation.cells,
-    claim: (if ($core_identity_match|not) then
+    claim: (if $core_identity_anchor_count != 1 then
+      {id:($p.id+"/claim/generation"),state:"REFUTED",stage:"DENOMINATOR",
+       step:"SELECT_CORE_IDENTITY_ANCHOR",reason:"CORE_IDENTITY_ANCHOR_CARDINALITY_INVALID",
+       next_operation:"DECLARE_EXACTLY_ONE_CORE_IDENTITY_ANCHOR",unknown_class:null,blocked_by:[],details:[]}
+    elif ($core_identity_match|not) then
       {id:($p.id+"/claim/generation"),state:"REFUTED",stage:"CORE_RELEASE",
        step:"BIND_CORE_RESOLUTION_RELEASE_IDENTITY",reason:"CORE_RESOLUTION_RELEASE_IDENTITY_MISMATCH",
        next_operation:"RESTORE_COMMON_CORE_RESOLUTION_RELEASE",unknown_class:null,blocked_by:[],details:[]}

@@ -99,6 +99,8 @@ jobs:
           external_denominator="$GITHUB_WORKSPACE/contracts/external-ledger-denominator-v1.json"
           external_profile="$GITHUB_WORKSPACE/fixtures/external-ledger/project.json"
 
+          jq -e '[.cells[]|select(.core_identity_anchor==true)]|length==1' "$denominator" "$external_denominator" >/dev/null
+
           start_ns=$(date +%s%N)
           /usr/bin/time -f '%M' -o "$RUNNER_TEMP/generator-rss" \
             bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-project-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/complete-a" "$SUBJECT_SHA" complete
@@ -118,7 +120,7 @@ jobs:
             .patterns.missing_required==0 and .patterns.unknown_required==0 and .patterns.refuted_required==0 and
             .authority.root_readme_readiness=="EXCLUDED" and
             .authority.activity_binding=="RELEASED_GOOO_ACTIVITY_RESOLUTION_RECEIPTS" and
-            .core_resolution.identity_match and .core_resolution.meta=={required:11,closed:11,unknown:0,refuted:0} and
+            .core_resolution.identity_match and .core_resolution.identity_anchor_count==1 and .core_resolution.meta=={required:11,closed:11,unknown:0,refuted:0} and
             .core_resolution.project=={required:12,closed:12,unknown:0,refuted:0} and
             ([.indicators[]|select(.closed==.total)]|length)==3 and
             ([.proofs[]|select(.closed==4 and .total==4)]|length)==3 and
@@ -189,7 +191,11 @@ jobs:
 
           jq '(.activity_resolution_observation.core_release.tag)="v0.2.0-dev-mismatch"' "$RUNNER_TEMP/resolved-project-graph.json" > "$RUNNER_TEMP/core-identity-mismatch-graph.json"
           bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/core-identity-mismatch-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/core-identity-mismatch" "$SUBJECT_SHA" core-resolution-identity-mismatch
-          jq -e '.decision=="FAIL_CLOSED" and .summary.closed==2 and .summary.refuted==10 and .core_resolution.identity_match==false and .claim.stage=="CORE_RELEASE" and .claim.step=="BIND_CORE_RESOLUTION_RELEASE_IDENTITY" and .claim.reason=="CORE_RESOLUTION_RELEASE_IDENTITY_MISMATCH"' "$RUNNER_TEMP/core-identity-mismatch/generation-report.json" >/dev/null
+          jq -e '.decision=="FAIL_CLOSED" and .summary.closed==2 and .summary.refuted==10 and .core_resolution.identity_match==false and .core_resolution.identity_anchor_count==1 and .claim.stage=="CORE_RELEASE" and .claim.step=="BIND_CORE_RESOLUTION_RELEASE_IDENTITY" and .claim.reason=="CORE_RESOLUTION_RELEASE_IDENTITY_MISMATCH"' "$RUNNER_TEMP/core-identity-mismatch/generation-report.json" >/dev/null
+
+          jq 'del(.cells[].core_identity_anchor)' "$denominator" > "$RUNNER_TEMP/missing-core-identity-anchor-denominator.json"
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-project-graph.json" "$RUNNER_TEMP/missing-core-identity-anchor-denominator.json" "$observation" "$profile" "$RUNNER_TEMP/missing-core-identity-anchor" "$SUBJECT_SHA" missing-core-identity-anchor
+          jq -e '.decision=="FAIL_CLOSED" and .summary.closed==0 and .summary.refuted==12 and .core_resolution.identity_anchor_count==0 and .claim.stage=="DENOMINATOR" and .claim.step=="SELECT_CORE_IDENTITY_ANCHOR" and .claim.reason=="CORE_IDENTITY_ANCHOR_CARDINALITY_INVALID"' "$RUNNER_TEMP/missing-core-identity-anchor/generation-report.json" >/dev/null
 
           bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/external-a" "$SUBJECT_SHA" external-ledger-complete
           bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/external-b" "$SUBJECT_SHA" external-ledger-complete
@@ -203,6 +209,10 @@ jobs:
             .subject.meta_graph_hash!=.subject.project_graph_hash and .claim.state=="CLOSED"
           ' "$RUNNER_TEMP/external-a/generation-report.json" >/dev/null
           jq -e '.decision=="GENERATION_VERIFIED" and .summary.closed==6 and .summary.total==6' "$RUNNER_TEMP/external-verification.json" >/dev/null
+
+          jq '(.activity_resolution_observation.core_release.tag)="v0.2.0-dev-mismatch"' "$RUNNER_TEMP/resolved-external-graph.json" > "$RUNNER_TEMP/external-core-identity-mismatch-graph.json"
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/external-core-identity-mismatch-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/external-core-identity-mismatch" "$SUBJECT_SHA" external-ledger-core-identity-mismatch
+          jq -e '.decision=="FAIL_CLOSED" and .summary.closed==8 and .summary.refuted==4 and .core_resolution.identity_match==false and .core_resolution.identity_anchor_count==1 and .claim.stage=="CORE_RELEASE" and .claim.step=="BIND_CORE_RESOLUTION_RELEASE_IDENTITY" and .claim.reason=="CORE_RESOLUTION_RELEASE_IDENTITY_MISMATCH"' "$RUNNER_TEMP/external-core-identity-mismatch/generation-report.json" >/dev/null
 
           compatibility_repository="$RUNNER_TEMP/local-ledger-lock-repository"
           mkdir -p "$compatibility_repository/contracts"
@@ -299,9 +309,11 @@ jobs:
             jq -r '"- missing core receipt: UNKNOWN \(.summary.unknown); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/missing-core-receipt/generation-report.json"
             jq -r '"- invalid core decision: REFUTED \(.summary.refuted); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/invalid-core-decision/generation-report.json"
             jq -r '"- mismatched core identities: \(.core_resolution.identity_match); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/core-identity-mismatch/generation-report.json"
+            jq -r '"- missing identity anchor: \(.core_resolution.identity_anchor_count); cells \(.summary.closed)/\(.summary.total) CLOSED; REFUTED \(.summary.refuted)"' "$RUNNER_TEMP/missing-core-identity-anchor/generation-report.json"
             jq -r '"- missing meta activity: required UNKNOWN \(.patterns.unknown_required); cells \(.summary.closed)/\(.summary.total) CLOSED; first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/missing-meta-activity/generation-report.json"
             jq -r '"- unbound required pattern: \(.patterns.missing_required); \(.claim.reason)"' "$RUNNER_TEMP/unbound-pattern/generation-report.json"
             jq -r '"- captured external profile: \(.summary.closed)/\(.summary.total) CLOSED; meta nodes \(.summary.meta_activity_nodes); project nodes \(.summary.project_activity_nodes)"' "$RUNNER_TEMP/external-a/generation-report.json"
+            jq -r '"- external core identity mismatch: \(.summary.closed)/\(.summary.total) CLOSED; REFUTED \(.summary.refuted); anchor \(.core_resolution.identity_anchor_count)"' "$RUNNER_TEMP/external-core-identity-mismatch/generation-report.json"
             jq -r '"- consumer core lock: \(.summary.closed)/\(.summary.total) CLOSED; patterns \(.patterns.promoted)"' "$RUNNER_TEMP/compatible-core-lock/generation-report.json"
             jq -r '"- nested consumer core lock: \(.summary.closed)/\(.summary.total) CLOSED; patterns \(.patterns.promoted)"' "$RUNNER_TEMP/nested-core-lock/generation-report.json"
             jq -r '"- generated digest verification: \(.summary.closed)/\(.summary.total); REFUTED \(.summary.refuted)"' "$RUNNER_TEMP/drift-verification.json"
@@ -322,11 +334,13 @@ jobs:
             ${{ runner.temp }}/missing-core-receipt
             ${{ runner.temp }}/invalid-core-decision
             ${{ runner.temp }}/core-identity-mismatch
+            ${{ runner.temp }}/missing-core-identity-anchor
             ${{ runner.temp }}/missing-meta-activity
             ${{ runner.temp }}/unbound-pattern
             ${{ runner.temp }}/external-a
             ${{ runner.temp }}/external-b
             ${{ runner.temp }}/external-verification.json
+            ${{ runner.temp }}/external-core-identity-mismatch
             ${{ runner.temp }}/compatible-core-lock
             ${{ runner.temp }}/compatible-core-lock-verification.json
             ${{ runner.temp }}/nested-core-lock
