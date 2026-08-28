@@ -90,7 +90,7 @@ jobs:
             .patterns.observed==12 and .patterns.support_eligible==12 and
             .patterns.meta_bound==11 and .patterns.promoted==11 and
             .patterns.excluded_without_meta==1 and .patterns.required==11 and
-            .patterns.missing_required==0 and
+            .patterns.missing_required==0 and .patterns.unknown_required==0 and .patterns.refuted_required==0 and
             .authority.root_readme_readiness=="EXCLUDED" and
             ([.proofs[]|select(.closed==4 and .total==4)]|length)==3 and
             .claim.state=="CLOSED"
@@ -104,6 +104,7 @@ jobs:
           jq -e '
             .decision=="INCOMPLETE" and .summary.closed==9 and .summary.unknown==3 and .summary.refuted==0 and
             .summary.direct_missing==1 and .summary.dependency_blocked==2 and
+            .patterns.missing_required==1 and .patterns.unknown_required==1 and .patterns.refuted_required==0 and
             .claim.stage=="GENERATION" and .claim.step=="PUBLISH_GENERATION_RECEIPT" and
             .claim.reason=="GENERATION_RECEIPT_ACTIVITY_UNAVAILABLE" and
             .claim.unknown_class=="DIRECT_MISSING"
@@ -113,6 +114,7 @@ jobs:
           bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/duplicate-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/duplicate-activity" "$SUBJECT_SHA" duplicate-publish-activity
           jq -e '
             .decision=="FAIL_CLOSED" and .summary.closed==9 and .summary.unknown==0 and .summary.refuted==3 and
+            .patterns.missing_required==1 and .patterns.unknown_required==0 and .patterns.refuted_required==1 and
             .claim.stage=="GENERATION" and .claim.step=="PUBLISH_GENERATION_RECEIPT" and
             .claim.reason=="AMBIGUOUS_ACTIVITY_BINDING"
           ' "$RUNNER_TEMP/duplicate-activity/generation-report.json" >/dev/null
@@ -122,6 +124,7 @@ jobs:
           jq -e '
             .decision=="FAIL_CLOSED" and .summary.closed==12 and .summary.unknown==0 and .summary.refuted==0 and
             .patterns.missing_required==1 and .patterns.missing_required_ids==["root-readme"] and
+            .patterns.unknown_required==0 and .patterns.refuted_required==1 and
             .claim.stage=="PROMOTION" and .claim.step=="REQUIRE_META_BOUND_PATTERN" and
             .claim.reason=="REQUIRED_PATTERN_NOT_PROMOTED"
           ' "$RUNNER_TEMP/unbound-pattern/generation-report.json" >/dev/null

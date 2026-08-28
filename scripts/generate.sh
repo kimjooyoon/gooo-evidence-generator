@@ -106,6 +106,13 @@ jq -S -n \
     select(([$patterns[] | select(.id == $required and .promoted)] | length) == 0) |
     $required
   ]) as $missing_required |
+  ([$missing_required[] as $required |
+    $patterns[] |
+    select(.id == $required and .support_eligible and
+      .meta_activity != null and .meta_activity_occurrences == 0) |
+    .id
+  ]) as $unknown_required |
+  ($missing_required - $unknown_required) as $refuted_required |
   (reduce $d.cells[] as $cell
     ({cells: [], decisions: {}};
       . as $acc |
@@ -141,9 +148,8 @@ jq -S -n \
   ([$evaluation.cells[] | select(.state != "CLOSED")][0] // null) as $first_nonclosed |
   {
     schema: "gooo/evidence-generator/report/v1",
-    decision: (if ($missing_required | length) > 0 then "FAIL_CLOSED"
-      elif $refuted > 0 then "FAIL_CLOSED"
-      elif $unknown > 0 then "INCOMPLETE"
+    decision: (if ($refuted_required | length) > 0 or $refuted > 0 then "FAIL_CLOSED"
+      elif ($unknown_required | length) > 0 or $unknown > 0 then "INCOMPLETE"
       else "PROJECT_GENERATED" end),
     scenario: $scenario,
     subject: {
@@ -165,10 +171,14 @@ jq -S -n \
       support_eligible: ([$patterns[] | select(.support_eligible)] | length),
       meta_bound: ([$patterns[] | select(.meta_bound)] | length),
       promoted: ([$patterns[] | select(.promoted)] | length),
-      excluded_without_meta: ([$patterns[] | select(.support_eligible and (.meta_bound | not))] | length),
+      excluded_without_meta: ([$patterns[] | select(.support_eligible and .meta_activity == null)] | length),
       required: ($p.required_patterns | length),
       missing_required: ($missing_required | length),
       missing_required_ids: $missing_required,
+      unknown_required: ($unknown_required | length),
+      unknown_required_ids: $unknown_required,
+      refuted_required: ($refuted_required | length),
+      refuted_required_ids: $refuted_required,
       items: $patterns
     },
     summary: {
@@ -189,21 +199,26 @@ jq -S -n \
     metrics: [
       {id: "gooo.metric.generator.activity-bindings.v1", value: $closed, total: $d.target_cells, unit: "cells"},
       {id: "gooo.metric.generator.promoted-patterns.v1", value: ([$patterns[] | select(.promoted)] | length), total: ([$patterns[] | select(.meta_activity != null)] | length), unit: "patterns"},
-      {id: "gooo.metric.generator.excluded-without-meta.v1", value: ([$patterns[] | select(.support_eligible and (.meta_bound | not))] | length), total: ($patterns | length), unit: "patterns"},
+      {id: "gooo.metric.generator.excluded-without-meta.v1", value: ([$patterns[] | select(.support_eligible and .meta_activity == null)] | length), total: ($patterns | length), unit: "patterns"},
       {id: "gooo.metric.generator.output-files.v1", value: $p.expected_output_files, total: $p.expected_output_files, unit: "files"}
     ],
     cells: $evaluation.cells,
-    claim: (if ($missing_required | length) > 0 then
-      {id: ($p.id + "/claim/generation"), state: "REFUTED", stage: "PROMOTION",
-       step: "REQUIRE_META_BOUND_PATTERN", reason: "REQUIRED_PATTERN_NOT_PROMOTED",
-       next_operation: "BIND_PATTERN_TO_GOOO_ACTIVITY_OR_REMOVE_REQUIREMENT",
-       unknown_class: null, blocked_by: [], details: $missing_required}
-    elif $first_nonclosed != null then
+    claim: (if $first_nonclosed != null then
       {id: ($p.id + "/claim/generation"), state: $first_nonclosed.state,
        stage: $first_nonclosed.stage, step: $first_nonclosed.step,
        reason: $first_nonclosed.reason, next_operation: $first_nonclosed.next_operation,
        unknown_class: $first_nonclosed.unknown_class, blocked_by: $first_nonclosed.blocked_by,
        details: []}
+    elif ($refuted_required | length) > 0 then
+      {id: ($p.id + "/claim/generation"), state: "REFUTED", stage: "PROMOTION",
+       step: "REQUIRE_META_BOUND_PATTERN", reason: "REQUIRED_PATTERN_NOT_PROMOTED",
+       next_operation: "BIND_PATTERN_TO_GOOO_ACTIVITY_OR_REMOVE_REQUIREMENT",
+       unknown_class: null, blocked_by: [], details: $refuted_required}
+    elif ($unknown_required | length) > 0 then
+      {id: ($p.id + "/claim/generation"), state: "UNKNOWN", stage: "PROMOTION",
+       step: "OBSERVE_REQUIRED_PATTERN_ACTIVITY", reason: "REQUIRED_PATTERN_ACTIVITY_UNAVAILABLE",
+       next_operation: "PROVIDE_REQUIRED_GOOO_ACTIVITY", unknown_class: "DIRECT_MISSING",
+       blocked_by: [], details: $unknown_required}
     else
       {id: ($p.id + "/claim/generation"), state: "CLOSED", stage: null, step: null,
        reason: "EVIDENCE_PROJECT_GENERATED", next_operation: "NONE",
