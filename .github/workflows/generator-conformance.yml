@@ -181,17 +181,14 @@ jobs:
               tag:$base.tag,
               tag_object_sha:$base.tag_object_sha,
               target_commit_sha:$base.target_commit_sha,
-              assets:[$release[0].assets[] | {
-                name:.name,
-                sha256:(.digest | sub("^sha256:";""))
-              }]
+              assets:[$release[0].assets[] | {name:.name,digest:.digest,size:.size}]
             }
           ' > "$compatibility_repository/contracts/core-release-lock-v1.json"
-          jq -e '.schema=="gooo/local-ledger/core-release-lock/v1" and (.assets|length)==8' "$compatibility_repository/contracts/core-release-lock-v1.json" >/dev/null
+          jq -e '.schema=="gooo/local-ledger/core-release-lock/v1" and (.assets|length)==8 and all(.assets[];.digest|test("^sha256:[0-9a-f]{64}$"))' "$compatibility_repository/contracts/core-release-lock-v1.json" >/dev/null
           bash scripts/generate.sh "$compatibility_repository" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/compatible-core-lock" "$SUBJECT_SHA" compatible-local-ledger-core-lock
           bash scripts/verify.sh "$RUNNER_TEMP/compatible-core-lock" "$RUNNER_TEMP/compatible-core-lock-verification.json"
           jq -e '.decision=="PROJECT_GENERATED" and .summary.closed==12 and .patterns.promoted==11' "$RUNNER_TEMP/compatible-core-lock/generation-report.json" >/dev/null
-          jq -e '.schema=="gooo/local-ledger/core-release-lock/v1" and (.assets|length)==8' "$RUNNER_TEMP/compatible-core-lock/contracts/core-release-lock-v1.json" >/dev/null
+          jq -e '.schema=="gooo/local-ledger/core-release-lock/v1" and (.assets|length)==8 and all(.assets[];has("digest") and (has("sha256")|not))' "$RUNNER_TEMP/compatible-core-lock/contracts/core-release-lock-v1.json" >/dev/null
           jq -e '.decision=="GENERATION_VERIFIED" and .summary.closed==6 and .summary.total==6' "$RUNNER_TEMP/compatible-core-lock-verification.json" >/dev/null
 
       - name: Publish exact indicators and enforce zero source writes
@@ -219,6 +216,7 @@ jobs:
               repository:{before_digest:$before,after_digest:$after,writes:$writes},
               deterministic_replay:true,captured_external_profiles:1,independent_public_consumers:0,
               core_lock_schema_variants:2,core_lock_asset_counts:[1,8],
+              core_lock_digest_vocabularies:["sha256","digest"],
               local_tests_run:0}' > "$RUNNER_TEMP/runtime.json"
           jq -e '.repository.writes==0 and .repository.before_digest==.repository.after_digest and .deterministic_replay==true and .local_tests_run==0' "$RUNNER_TEMP/runtime.json" >/dev/null
 

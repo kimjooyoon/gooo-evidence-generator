@@ -56,6 +56,9 @@ Gooo archive remains mandatory.
 
 CI covers the generator lock with one asset and the captured local-ledger lock
 shape with eight assets. It does not rewrite either lock into the other shape.
+The former carries raw hexadecimal in `sha256`; the latter carries the
+algorithm-qualified value in `digest`. Validation normalizes those values only
+for comparison and preserves the original field vocabulary in generated output.
 
 ## Non-claims
 
