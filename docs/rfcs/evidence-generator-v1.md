@@ -59,6 +59,14 @@ The same twelve cells are also partitioned into indicator classes:
 `OUTCOME 3`, `DRIVER 5`, and `GUARDRAIL 4`. These are exact denominators, not
 weighted scores.
 
+Each denominator declares exactly one cell with `core_identity_anchor: true`.
+The generator does not recognize an identity cell by its ID or Activity name.
+When released core identities differ, it refutes that declared anchor and lets
+the denominator dependency graph propagate the refutation. An anchor count
+other than one is itself a fail-closed denominator error. This permits the
+self-hosted and external-ledger denominators to choose different semantic
+anchors without adding consumer names to generator code.
+
 ## Independence rule
 
 Source repository SHAs are immutable observation references. Generator CI does
