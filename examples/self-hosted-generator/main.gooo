@@ -1,18 +1,19 @@
-namespace evidencegenerator "gooo://evidence-generator/self-hosted/v1"
+package evidencegenerator
+namespace evidencegenerator
 
-entity ReleasedGoooIdentity "gooo://evidence-generator/entity/released-gooo"
-entity PatternObservation "gooo://evidence-generator/entity/pattern-observation"
-entity PromotionPolicy "gooo://evidence-generator/entity/promotion-policy"
-entity GeneratedProjectAuthority "gooo://evidence-generator/entity/project-authority"
-entity GeneratedDenominator "gooo://evidence-generator/entity/generated-denominator"
-entity GeneratedActivityBindings "gooo://evidence-generator/entity/activity-bindings"
-entity GeneratedConformancePlan "gooo://evidence-generator/entity/conformance-plan"
-entity GenerationReceipt "gooo://evidence-generator/entity/generation-receipt"
-entity ReplayObservation "gooo://evidence-generator/entity/replay-observation"
-entity ReadOnlyObservation "gooo://evidence-generator/entity/read-only-observation"
-entity UnknownTrace "gooo://evidence-generator/entity/unknown-trace"
-entity RefutationTrace "gooo://evidence-generator/entity/refutation-trace"
-entity EvidenceDecision "gooo://evidence-generator/entity/evidence-decision"
+entity ReleasedGoooIdentity id "gooo://evidence-generator/entity/released-gooo"
+entity PatternObservation id "gooo://evidence-generator/entity/pattern-observation"
+entity PromotionPolicy id "gooo://evidence-generator/entity/promotion-policy"
+entity GeneratedProjectAuthority id "gooo://evidence-generator/entity/project-authority"
+entity GeneratedDenominator id "gooo://evidence-generator/entity/generated-denominator"
+entity GeneratedActivityBindings id "gooo://evidence-generator/entity/activity-bindings"
+entity GeneratedConformancePlan id "gooo://evidence-generator/entity/conformance-plan"
+entity GenerationReceipt id "gooo://evidence-generator/entity/generation-receipt"
+entity ReplayObservation id "gooo://evidence-generator/entity/replay-observation"
+entity ReadOnlyObservation id "gooo://evidence-generator/entity/read-only-observation"
+entity UnknownTrace id "gooo://evidence-generator/entity/unknown-trace"
+entity RefutationTrace id "gooo://evidence-generator/entity/refutation-trace"
+entity EvidenceDecision id "gooo://evidence-generator/entity/evidence-decision"
 
 activity ObserveReleasedGoooIdentity(ReleasedGoooIdentity) -> EvidenceDecision
 activity ObservePatternSupport(PatternObservation) -> EvidenceDecision
