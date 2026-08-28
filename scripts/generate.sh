@@ -63,6 +63,10 @@ jq -e '
 jq -e '.schema_version == "gooo-graph/v1" and (.nodes | type) == "array"' "$meta_graph" >/dev/null
 jq -e '.schema_version == "gooo-graph/v1" and (.nodes | type) == "array"' "$project_graph" >/dev/null
 jq -e '
+  def asset_sha256:
+    if (.sha256? | type) == "string" then .sha256
+    elif (.digest? | type) == "string" then (.digest | sub("^sha256:";""))
+    else "" end;
   (.schema | type) == "string" and (.schema | endswith("/core-release-lock/v1")) and
   (.repository | type) == "string" and (.repository | length) > 0 and
   (.tag | type) == "string" and (.tag | length) > 0 and
@@ -71,7 +75,7 @@ jq -e '
   (.assets | type) == "array" and (.assets | length) > 0 and
   all(.assets[];
     (.name | type) == "string" and (.name | length) > 0 and
-    (.sha256 | type) == "string" and (.sha256 | test("^[0-9a-f]{64}$"))) and
+    (asset_sha256 | test("^[0-9a-f]{64}$"))) and
   any(.assets[]; .name == "gooo-linux-amd64.tar.gz")
 ' "$repository/contracts/core-release-lock-v1.json" >/dev/null
 

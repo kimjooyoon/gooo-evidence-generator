@@ -84,6 +84,10 @@ own lock-file shape. CI covers two valid lock contracts:
 - `gooo/core-release-lock/v1` with `1` pinned Linux asset;
 - `gooo/local-ledger/core-release-lock/v1` with all `8` release assets.
 
+The first uses `sha256: <64hex>` as a dedicated field. The second preserves
+GitHub's `digest: sha256:<64hex>` vocabulary. Both are validated as the same
+hash algorithm without rewriting either serialized contract.
+
 Both must produce `12/12 CLOSED`, `11` promoted patterns, and `6/6` verified
 manifest entries. A lock is accepted only when its schema ends in
 `/core-release-lock/v1`, its tag and commit identities are explicit, every
