@@ -1,0 +1,26 @@
+{
+  "schema": "gooo/evidence-generator/project/v2",
+  "id": "gooo://project/captured-external-ledger/v1",
+  "name": "captured-external-ledger",
+  "graph_roles": {"promotion": "meta_graph", "cells": "project_graph"},
+  "expected_output_files": 7,
+  "required_patterns": ["released-core-lock","fixed-denominator","gooo-activity-model","evaluator-contract","ci-evidence-artifact","contract-rfc","deterministic-replay","zero-source-write","explicit-unknown","explicit-refutation","fixture-bundle"],
+  "conformance_checks": [
+    {"ordinal":1,"id":"RELEASE_IDENTITY","expected":"PINNED_RELEASE_OBSERVED"},
+    {"ordinal":2,"id":"ACTIVITY_SET","expected":"ACTIVITY_BINDINGS_EQUAL_DENOMINATOR"},
+    {"ordinal":3,"id":"FIXED_DENOMINATOR","expected":"DECLARED_TOTAL_EQUALS_CELL_COUNT"},
+    {"ordinal":4,"id":"DETERMINISTIC_REPLAY","expected":"BYTE_IDENTICAL_OUTPUT"},
+    {"ordinal":5,"id":"ZERO_SOURCE_WRITE","expected":"SOURCE_REPOSITORY_WRITES_ZERO"},
+    {"ordinal":6,"id":"UNKNOWN_TRACE","expected":"DIRECT_MISSING_AND_DEPENDENCY_BLOCKED_PRESERVED"},
+    {"ordinal":7,"id":"REFUTATION_TRACE","expected":"AMBIGUOUS_BINDING_REFUTED"},
+    {"ordinal":8,"id":"GENERATED_DIGESTS","expected":"ALL_MANIFEST_DIGESTS_MATCH"}
+  ],
+  "scenarios": [
+    {"id":"external-ledger-complete","expected_decision":"PROJECT_GENERATED","closed":12,"unknown":0,"refuted":0},
+    {"id":"missing-project-activity","expected_decision":"INCOMPLETE"},
+    {"id":"duplicate-project-activity","expected_decision":"FAIL_CLOSED"},
+    {"id":"missing-meta-activity","expected_decision":"INCOMPLETE"},
+    {"id":"unbound-required-pattern","expected_decision":"FAIL_CLOSED"},
+    {"id":"generated-file-drift","expected_decision":"FAIL_CLOSED"}
+  ]
+}

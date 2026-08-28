@@ -11,8 +11,8 @@ verification_report=$2
 manifest="$bundle/generation-manifest.json"
 generation_report="$bundle/generation-report.json"
 
-jq -e '.schema == "gooo/evidence-generator/manifest/v1" and .tracked_file_count == (.files | length)' "$manifest" >/dev/null
-jq -e '.schema == "gooo/evidence-generator/report/v1"' "$generation_report" >/dev/null
+jq -e '.schema == "gooo/evidence-generator/manifest/v2" and .tracked_file_count == (.files | length)' "$manifest" >/dev/null
+jq -e '.schema == "gooo/evidence-generator/report/v2"' "$generation_report" >/dev/null
 
 results='[]'
 while IFS=$'\t' read -r relative_path expected_digest expected_size; do
@@ -72,7 +72,7 @@ jq -S -n \
   ([$results[] | select(.state == "REFUTED")] | length) as $refuted |
   ([$results[] | select(.state != "CLOSED")][0] // null) as $first_nonclosed |
   {
-    schema: "gooo/evidence-generator/verification/v1",
+    schema: "gooo/evidence-generator/verification/v2",
     decision: (if ($identity_match | not) or $refuted > 0 then "FAIL_CLOSED"
       elif $unknown > 0 then "INCOMPLETE" else "GENERATION_VERIFIED" end),
     subject_sha: $subject_sha,
