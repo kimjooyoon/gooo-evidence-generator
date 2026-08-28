@@ -189,7 +189,7 @@ jobs:
 
           jq '(.activity_resolution_observation.core_release.tag)="v0.2.0-dev-mismatch"' "$RUNNER_TEMP/resolved-project-graph.json" > "$RUNNER_TEMP/core-identity-mismatch-graph.json"
           bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/core-identity-mismatch-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/core-identity-mismatch" "$SUBJECT_SHA" core-resolution-identity-mismatch
-          jq -e '.decision=="FAIL_CLOSED" and .core_resolution.identity_match==false and .claim.stage=="CORE_RELEASE" and .claim.step=="BIND_CORE_RESOLUTION_RELEASE_IDENTITY" and .claim.reason=="CORE_RESOLUTION_RELEASE_IDENTITY_MISMATCH"' "$RUNNER_TEMP/core-identity-mismatch/generation-report.json" >/dev/null
+          jq -e '.decision=="FAIL_CLOSED" and .summary.closed==2 and .summary.refuted==10 and .core_resolution.identity_match==false and .claim.stage=="CORE_RELEASE" and .claim.step=="BIND_CORE_RESOLUTION_RELEASE_IDENTITY" and .claim.reason=="CORE_RESOLUTION_RELEASE_IDENTITY_MISMATCH"' "$RUNNER_TEMP/core-identity-mismatch/generation-report.json" >/dev/null
 
           bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/external-a" "$SUBJECT_SHA" external-ledger-complete
           bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/external-b" "$SUBJECT_SHA" external-ledger-complete

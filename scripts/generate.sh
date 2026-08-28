@@ -203,7 +203,9 @@ jq -S -n \
       (resolution_for($project;$cell.id;$cell.activity)) as $resolution |
       ($resolution.occurrences) as $activity_occurrences |
       ([$cell.depends_on[]? | $acc.decisions[.]]) as $dependencies |
-      (if $resolution.state == "UNKNOWN" then
+      (if $cell.id=="RELEASED_GOOO_IDENTITY" and ($core_identity_match|not) then
+        {cell_id:$cell.id,state:"REFUTED",stage:"CORE_RELEASE",step:"BIND_CORE_RESOLUTION_RELEASE_IDENTITY",reason:"CORE_RESOLUTION_RELEASE_IDENTITY_MISMATCH",next_operation:"RESTORE_COMMON_CORE_RESOLUTION_RELEASE",unknown_class:null,blocked_by:[]}
+      elif $resolution.state == "UNKNOWN" then
         ({cell_id:$cell.id,state:"UNKNOWN",reason:(if $resolution.reason=="ACTIVITY_NOT_FOUND" then $cell.unknown_reason else $resolution.reason end),
           next_operation:(if $resolution.reason=="ACTIVITY_NOT_FOUND" then $cell.next_operation else $resolution.next_operation end),unknown_class:"DIRECT_MISSING",blocked_by:[]} +
          (if $resolution.reason=="ACTIVITY_NOT_FOUND" then {} else {stage:$resolution.stage,step:$resolution.step} end))
