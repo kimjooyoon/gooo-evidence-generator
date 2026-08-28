@@ -38,8 +38,10 @@ jobs:
           gh api "repos/kimjooyoon/meta-ontology-go/releases/tags/$tag" > "$RUNNER_TEMP/release.json"
           asset_id=$(jq -r --arg name "$asset_name" '.assets[] | select(.name==$name) | .id' "$RUNNER_TEMP/release.json")
           test -n "$asset_id"
-          gh api -H 'Accept: application/octet-stream' "repos/kimjooyoon/meta-ontology-go/releases/assets/$asset_id" > "$RUNNER_TEMP/gooo"
-          printf '%s  %s\n' "$expected_digest" "$RUNNER_TEMP/gooo" | sha256sum -c -
+          archive="$RUNNER_TEMP/$asset_name"
+          gh api -H 'Accept: application/octet-stream' "repos/kimjooyoon/meta-ontology-go/releases/assets/$asset_id" > "$archive"
+          printf '%s  %s\n' "$expected_digest" "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
           chmod +x "$RUNNER_TEMP/gooo"
           echo "GOOO_BIN=$RUNNER_TEMP/gooo" >> "$GITHUB_ENV"
 

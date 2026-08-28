@@ -6,7 +6,7 @@
   "target_commit_sha": "cf07bc02cda5cc0a05019d2ad63faeb3fa9edb28",
   "assets": [
     {
-      "name": "gooo-linux-amd64",
+      "name": "gooo-linux-amd64.tar.gz",
       "sha256": "1995a3243845531e58260e2865ac75552a6c36925e24ee49dc162c64f62f27b4"
     }
   ]
