@@ -60,7 +60,7 @@ jobs:
           "$GOOO_BIN" check --json "$source_file" > "$RUNNER_TEMP/syntax.json"
           "$GOOO_BIN" check --semantic --json "$source_file" > "$RUNNER_TEMP/semantic.json"
           /usr/bin/time -f '%M' -o "$RUNNER_TEMP/graph-rss" \
-            "$GOOO_BIN" graph --json "$source_file" > "$RUNNER_TEMP/graph.json"
+            "$GOOO_BIN" graph dump "$source_file" > "$RUNNER_TEMP/graph.json"
           jq -e '.schema_version=="gooo-version/v1" and .language=="gooo"' "$RUNNER_TEMP/version.json" >/dev/null
           jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok"' "$RUNNER_TEMP/syntax.json" >/dev/null
           jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok" and .semantic_hash!=null' "$RUNNER_TEMP/semantic.json" >/dev/null
