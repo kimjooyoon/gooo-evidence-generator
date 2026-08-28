@@ -6,7 +6,7 @@ entity PatternObservation id "gooo://evidence-generator/entity/pattern-observati
 entity PromotionPolicy id "gooo://evidence-generator/entity/promotion-policy"
 entity GeneratedProjectAuthority id "gooo://evidence-generator/entity/project-authority"
 entity GeneratedDenominator id "gooo://evidence-generator/entity/generated-denominator"
-entity GeneratedActivityBindings id "gooo://evidence-generator/entity/activity-bindings"
+entity CoreActivityResolutionReceipts id "gooo://evidence-generator/entity/core-activity-resolution-receipts"
 entity GeneratedConformancePlan id "gooo://evidence-generator/entity/conformance-plan"
 entity GenerationReceipt id "gooo://evidence-generator/entity/generation-receipt"
 entity ReplayObservation id "gooo://evidence-generator/entity/replay-observation"
@@ -20,7 +20,7 @@ activity ObservePatternSupport(PatternObservation) -> EvidenceDecision
 activity ApplyPromotionThreshold(PromotionPolicy) -> EvidenceDecision
 activity DeclareGeneratedProjectAuthority(GeneratedProjectAuthority) -> EvidenceDecision
 activity GenerateDenominator(GeneratedDenominator) -> EvidenceDecision
-activity BindGeneratedActivities(GeneratedActivityBindings) -> EvidenceDecision
+activity BindGeneratedActivities(CoreActivityResolutionReceipts) -> EvidenceDecision
 activity GenerateConformancePlan(GeneratedConformancePlan) -> EvidenceDecision
 activity PublishGenerationReceipt(GenerationReceipt) -> EvidenceDecision
 activity ObserveDeterministicReplay(ReplayObservation) -> EvidenceDecision

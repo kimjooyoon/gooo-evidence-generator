@@ -68,10 +68,26 @@ jobs:
           jq -e '.schema_version=="gooo-version/v1" and .language=="gooo"' "$RUNNER_TEMP/version.json" >/dev/null
           jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok"' "$RUNNER_TEMP/syntax.json" >/dev/null
           jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok" and .semantic_hash!=null' "$RUNNER_TEMP/semantic.json" >/dev/null
-          jq -e '.schema_version=="gooo-graph/v1" and ([.nodes[]|select(.kind=="Activity")]|length)==12' "$RUNNER_TEMP/graph.json" >/dev/null
+          jq -e '.schema_version=="gooo-graph/v1"' "$RUNNER_TEMP/graph.json" >/dev/null
           jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok"' "$RUNNER_TEMP/external-syntax.json" >/dev/null
           jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok" and .semantic_hash!=null' "$RUNNER_TEMP/external-semantic.json" >/dev/null
-          jq -e '.schema_version=="gooo-graph/v1" and ([.nodes[]|select(.kind=="Activity")]|length)==12' "$RUNNER_TEMP/external-graph.json" >/dev/null
+          jq -e '.schema_version=="gooo-graph/v1"' "$RUNNER_TEMP/external-graph.json" >/dev/null
+
+          jq -S '
+            [.patterns[]|select(.meta_activity!=null)] | to_entries |
+            {schema:"gooo/evidence-generator/activity-selector-set/v1",role:"meta_graph",selectors:[.[]|{ordinal:(.key+1),id:.value.id,activity:.value.meta_activity}]}
+          ' contracts/repetition-observation-v1.json > "$RUNNER_TEMP/meta-selectors.json"
+          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"project_graph",selectors:[.cells[]|{ordinal,id,activity}]}' \
+            contracts/evidence-generator-denominator-v1.json > "$RUNNER_TEMP/project-selectors.json"
+          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"project_graph",selectors:[.cells[]|{ordinal,id,activity}]}' \
+            contracts/external-ledger-denominator-v1.json > "$RUNNER_TEMP/external-selectors.json"
+          binder=scripts/bind-activity-resolutions.sh
+          core_lock=contracts/core-release-lock-v1.json
+          bash "$binder" "$GOOO_BIN" "$source_file" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/meta-selectors.json" "$core_lock" "$RUNNER_TEMP/resolved-meta-graph.json" meta_graph
+          bash "$binder" "$GOOO_BIN" "$source_file" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/project-selectors.json" "$core_lock" "$RUNNER_TEMP/resolved-project-graph.json" project_graph
+          bash "$binder" "$GOOO_BIN" "$external_source" "$RUNNER_TEMP/external-graph.json" "$RUNNER_TEMP/external-selectors.json" "$core_lock" "$RUNNER_TEMP/resolved-external-graph.json" project_graph
+          jq -e '.activity_resolution_observation.summary=={expected:11,observed:11,closed:11,unknown:0,refuted:0,unique_selectors:11}' "$RUNNER_TEMP/resolved-meta-graph.json" >/dev/null
+          jq -e '.activity_resolution_observation.summary=={expected:12,observed:12,closed:12,unknown:0,refuted:0,unique_selectors:12}' "$RUNNER_TEMP/resolved-project-graph.json" "$RUNNER_TEMP/resolved-external-graph.json" >/dev/null
 
       - name: Generate complete and adversarial bundles
         shell: bash
@@ -85,10 +101,10 @@ jobs:
 
           start_ns=$(date +%s%N)
           /usr/bin/time -f '%M' -o "$RUNNER_TEMP/generator-rss" \
-            bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/complete-a" "$SUBJECT_SHA" complete
+            bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-project-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/complete-a" "$SUBJECT_SHA" complete
           end_ns=$(date +%s%N)
           echo $(( (end_ns-start_ns)/1000000 )) > "$RUNNER_TEMP/generator-wall-ms"
-          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/complete-b" "$SUBJECT_SHA" complete
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-project-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/complete-b" "$SUBJECT_SHA" complete
           diff -qr "$RUNNER_TEMP/complete-a" "$RUNNER_TEMP/complete-b"
           bash scripts/verify.sh "$RUNNER_TEMP/complete-a" "$RUNNER_TEMP/verification.json"
 
@@ -101,6 +117,10 @@ jobs:
             .patterns.excluded_without_meta==1 and .patterns.required==11 and
             .patterns.missing_required==0 and .patterns.unknown_required==0 and .patterns.refuted_required==0 and
             .authority.root_readme_readiness=="EXCLUDED" and
+            .authority.activity_binding=="RELEASED_GOOO_ACTIVITY_RESOLUTION_RECEIPTS" and
+            .core_resolution.identity_match and .core_resolution.meta=={required:11,closed:11,unknown:0,refuted:0} and
+            .core_resolution.project=={required:12,closed:12,unknown:0,refuted:0} and
+            ([.indicators[]|select(.closed==.total)]|length)==3 and
             ([.proofs[]|select(.closed==4 and .total==4)]|length)==3 and
             .claim.state=="CLOSED"
           ' "$RUNNER_TEMP/complete-a/generation-report.json" >/dev/null
@@ -108,8 +128,10 @@ jobs:
           test "$(find "$RUNNER_TEMP/complete-a" -type f | wc -l)" -eq 7
           jq -e '.decision=="GENERATION_VERIFIED" and .summary.total==6 and .summary.closed==6 and .summary.unknown==0 and .summary.refuted==0 and .summary.actual_output_files==7' "$RUNNER_TEMP/verification.json" >/dev/null
 
-          jq '.nodes |= map(select(.name!="PublishGenerationReceipt"))' "$RUNNER_TEMP/graph.json" > "$RUNNER_TEMP/missing-graph.json"
-          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/missing-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/missing-activity" "$SUBJECT_SHA" missing-publish-activity
+          awk '!/^activity PublishGenerationReceipt\(/' examples/self-hosted-generator/main.gooo > "$RUNNER_TEMP/missing-source.gooo"
+          "$GOOO_BIN" graph dump "$RUNNER_TEMP/missing-source.gooo" > "$RUNNER_TEMP/missing-graph.json"
+          bash scripts/bind-activity-resolutions.sh "$GOOO_BIN" "$RUNNER_TEMP/missing-source.gooo" "$RUNNER_TEMP/missing-graph.json" "$RUNNER_TEMP/project-selectors.json" contracts/core-release-lock-v1.json "$RUNNER_TEMP/missing-resolved-project-graph.json" project_graph
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/missing-resolved-project-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/missing-activity" "$SUBJECT_SHA" missing-publish-activity
           jq -e '
             .decision=="INCOMPLETE" and .summary.closed==9 and .summary.unknown==3 and .summary.refuted==0 and
             .summary.direct_missing==1 and .summary.dependency_blocked==2 and
@@ -119,8 +141,11 @@ jobs:
             .claim.unknown_class=="DIRECT_MISSING"
           ' "$RUNNER_TEMP/missing-activity/generation-report.json" >/dev/null
 
-          jq '(.nodes[] | select(.kind=="Activity" and .name=="PublishGenerationReceipt")) as $node | .nodes += [($node | .id = (.id + "-duplicate"))]' "$RUNNER_TEMP/graph.json" > "$RUNNER_TEMP/duplicate-graph.json"
-          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/duplicate-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/duplicate-activity" "$SUBJECT_SHA" duplicate-publish-activity
+          cp examples/self-hosted-generator/main.gooo "$RUNNER_TEMP/duplicate-source.gooo"
+          grep '^activity PublishGenerationReceipt(' examples/self-hosted-generator/main.gooo >> "$RUNNER_TEMP/duplicate-source.gooo"
+          "$GOOO_BIN" graph dump "$RUNNER_TEMP/duplicate-source.gooo" > "$RUNNER_TEMP/duplicate-graph.json"
+          bash scripts/bind-activity-resolutions.sh "$GOOO_BIN" "$RUNNER_TEMP/duplicate-source.gooo" "$RUNNER_TEMP/duplicate-graph.json" "$RUNNER_TEMP/project-selectors.json" contracts/core-release-lock-v1.json "$RUNNER_TEMP/duplicate-resolved-project-graph.json" project_graph
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/duplicate-resolved-project-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/duplicate-activity" "$SUBJECT_SHA" duplicate-publish-activity
           jq -e '
             .decision=="FAIL_CLOSED" and .summary.closed==9 and .summary.unknown==0 and .summary.refuted==3 and
             .patterns.missing_required==0 and .patterns.unknown_required==0 and .patterns.refuted_required==0 and
@@ -129,8 +154,8 @@ jobs:
           ' "$RUNNER_TEMP/duplicate-activity/generation-report.json" >/dev/null
 
           jq '.required_patterns += ["root-readme"]' "$profile" > "$RUNNER_TEMP/unbound-profile.json"
-          jq '.nodes |= map(select(.name!="PublishGenerationReceipt"))' "$RUNNER_TEMP/graph.json" > "$RUNNER_TEMP/missing-meta-graph.json"
-          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/missing-meta-graph.json" "$RUNNER_TEMP/graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/missing-meta-activity" "$SUBJECT_SHA" missing-meta-publish-activity
+          bash scripts/bind-activity-resolutions.sh "$GOOO_BIN" "$RUNNER_TEMP/missing-source.gooo" "$RUNNER_TEMP/missing-graph.json" "$RUNNER_TEMP/meta-selectors.json" contracts/core-release-lock-v1.json "$RUNNER_TEMP/missing-resolved-meta-graph.json" meta_graph
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/missing-resolved-meta-graph.json" "$RUNNER_TEMP/resolved-project-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/missing-meta-activity" "$SUBJECT_SHA" missing-meta-publish-activity
           jq -e '
             .decision=="INCOMPLETE" and .summary.closed==12 and .summary.unknown==0 and .summary.refuted==0 and
             .patterns.missing_required==1 and .patterns.unknown_required==1 and .patterns.refuted_required==0 and
@@ -138,7 +163,7 @@ jobs:
             .claim.reason=="REQUIRED_PATTERN_ACTIVITY_UNAVAILABLE" and .claim.unknown_class=="DIRECT_MISSING"
           ' "$RUNNER_TEMP/missing-meta-activity/generation-report.json" >/dev/null
 
-          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/graph.json" "$denominator" "$observation" "$RUNNER_TEMP/unbound-profile.json" "$RUNNER_TEMP/unbound-pattern" "$SUBJECT_SHA" unbound-required-pattern
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-project-graph.json" "$denominator" "$observation" "$RUNNER_TEMP/unbound-profile.json" "$RUNNER_TEMP/unbound-pattern" "$SUBJECT_SHA" unbound-required-pattern
           jq -e '
             .decision=="FAIL_CLOSED" and .summary.closed==12 and .summary.unknown==0 and .summary.refuted==0 and
             .patterns.missing_required==1 and .patterns.missing_required_ids==["root-readme"] and
@@ -156,8 +181,20 @@ jobs:
             .claim.reason=="GENERATED_FILE_DIGEST_MISMATCH"
           ' "$RUNNER_TEMP/drift-verification.json" >/dev/null
 
-          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/external-a" "$SUBJECT_SHA" external-ledger-complete
-          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/external-b" "$SUBJECT_SHA" external-ledger-complete
+          jq 'del(.activity_resolution_observation.entries[7])' "$RUNNER_TEMP/resolved-project-graph.json" > "$RUNNER_TEMP/missing-core-receipt-graph.json"
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/missing-core-receipt-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/missing-core-receipt" "$SUBJECT_SHA" missing-core-resolution-receipt
+          jq -e '.decision=="INCOMPLETE" and .summary.closed==9 and .summary.unknown==3 and .claim.stage=="RESOLUTION_OBSERVATION" and .claim.step=="BIND_CORE_ACTIVITY_RESOLUTION_RECEIPT" and .claim.reason=="CORE_ACTIVITY_RESOLUTION_RECEIPT_UNAVAILABLE"' "$RUNNER_TEMP/missing-core-receipt/generation-report.json" >/dev/null
+
+          jq '(.activity_resolution_observation.entries[7].receipt.decision)="FIXED_POINT"' "$RUNNER_TEMP/resolved-project-graph.json" > "$RUNNER_TEMP/invalid-core-decision-graph.json"
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/invalid-core-decision-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/invalid-core-decision" "$SUBJECT_SHA" invalid-core-resolution-decision
+          jq -e '.decision=="FAIL_CLOSED" and .summary.closed==9 and .summary.refuted==3 and .claim.stage=="RESOLUTION" and .claim.step=="RESOLVE_ACTIVITY_CARDINALITY" and .claim.reason=="UNRECOGNIZED_CORE_ACTIVITY_RESOLUTION_DECISION"' "$RUNNER_TEMP/invalid-core-decision/generation-report.json" >/dev/null
+
+          jq '(.activity_resolution_observation.core_release.tag)="v0.2.0-dev-mismatch"' "$RUNNER_TEMP/resolved-project-graph.json" > "$RUNNER_TEMP/core-identity-mismatch-graph.json"
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/core-identity-mismatch-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/core-identity-mismatch" "$SUBJECT_SHA" core-resolution-identity-mismatch
+          jq -e '.decision=="FAIL_CLOSED" and .core_resolution.identity_match==false and .claim.stage=="CORE_RELEASE" and .claim.step=="BIND_CORE_RESOLUTION_RELEASE_IDENTITY" and .claim.reason=="CORE_RESOLUTION_RELEASE_IDENTITY_MISMATCH"' "$RUNNER_TEMP/core-identity-mismatch/generation-report.json" >/dev/null
+
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/external-a" "$SUBJECT_SHA" external-ledger-complete
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/external-b" "$SUBJECT_SHA" external-ledger-complete
           diff -qr "$RUNNER_TEMP/external-a" "$RUNNER_TEMP/external-b"
           bash scripts/verify.sh "$RUNNER_TEMP/external-a" "$RUNNER_TEMP/external-verification.json"
           jq -e '
@@ -185,7 +222,7 @@ jobs:
             }
           ' > "$compatibility_repository/contracts/core-release-lock-v1.json"
           jq -e '.schema=="gooo/local-ledger/core-release-lock/v1" and (.assets|length)==8 and all(.assets[];.digest|test("^sha256:[0-9a-f]{64}$"))' "$compatibility_repository/contracts/core-release-lock-v1.json" >/dev/null
-          bash scripts/generate.sh "$compatibility_repository" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/compatible-core-lock" "$SUBJECT_SHA" compatible-local-ledger-core-lock
+          bash scripts/generate.sh "$compatibility_repository" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/compatible-core-lock" "$SUBJECT_SHA" compatible-local-ledger-core-lock
           bash scripts/verify.sh "$RUNNER_TEMP/compatible-core-lock" "$RUNNER_TEMP/compatible-core-lock-verification.json"
           jq -e '.decision=="PROJECT_GENERATED" and .summary.closed==12 and .patterns.promoted==11' "$RUNNER_TEMP/compatible-core-lock/generation-report.json" >/dev/null
           jq -e '.schema=="gooo/local-ledger/core-release-lock/v1" and (.assets|length)==8 and all(.assets[];has("digest") and (has("sha256")|not))' "$RUNNER_TEMP/compatible-core-lock/contracts/core-release-lock-v1.json" >/dev/null
@@ -214,7 +251,7 @@ jobs:
           ' > "$nested_repository/contracts/core-release-lock-v1.json"
           jq -e 'has("assets")|not' "$nested_repository/contracts/core-release-lock-v1.json" >/dev/null
           jq -e '.release.tag_object.type=="tag" and .release.target.type=="commit" and (.release.assets|length)==8' "$nested_repository/contracts/core-release-lock-v1.json" >/dev/null
-          bash scripts/generate.sh "$nested_repository" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/nested-core-lock" "$SUBJECT_SHA" compatible-design-evidence-core-lock
+          bash scripts/generate.sh "$nested_repository" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/resolved-external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/nested-core-lock" "$SUBJECT_SHA" compatible-design-evidence-core-lock
           bash scripts/verify.sh "$RUNNER_TEMP/nested-core-lock" "$RUNNER_TEMP/nested-core-lock-verification.json"
           jq -e '.decision=="PROJECT_GENERATED" and .summary.closed==12 and .patterns.promoted==11' "$RUNNER_TEMP/nested-core-lock/generation-report.json" >/dev/null
           jq -e '(has("assets")|not) and .release.tag_object.type=="tag" and .release.target.type=="commit" and (.release.assets|length)==8' "$RUNNER_TEMP/nested-core-lock/contracts/core-release-lock-v1.json" >/dev/null
@@ -240,8 +277,10 @@ jobs:
             --argjson writes "$writes" \
             --argjson peak_rss_kib "$peak_rss_kib" \
             --argjson wall_ms "$wall_ms" \
+            --slurpfile report "$RUNNER_TEMP/complete-a/generation-report.json" \
             '{schema:"gooo/evidence-generator/runtime/v2",subject_sha:$subject_sha,
               generator:{peak_rss_kib:$peak_rss_kib,wall_ms:$wall_ms},
+              core_resolution:{meta:$report[0].core_resolution.meta,project:$report[0].core_resolution.project,identity_match:$report[0].core_resolution.identity_match},
               repository:{before_digest:$before,after_digest:$after,writes:$writes},
               deterministic_replay:true,captured_external_profiles:1,independent_public_consumers:0,
               core_lock_schema_variants:2,core_lock_structure_variants:["flat","nested"],
@@ -258,6 +297,10 @@ jobs:
               "- README readiness authority: \(.authority.root_readme_readiness)"' "$RUNNER_TEMP/complete-a/generation-report.json"
             jq -r '"- missing activity: direct \(.summary.direct_missing); dependency blocked \(.summary.dependency_blocked); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/missing-activity/generation-report.json"
             jq -r '"- duplicate activity: refuted \(.summary.refuted); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/duplicate-activity/generation-report.json"
+            jq -r '"- core resolutions: meta \(.core_resolution.meta.closed)/\(.core_resolution.meta.required); project \(.core_resolution.project.closed)/\(.core_resolution.project.required)"' "$RUNNER_TEMP/complete-a/generation-report.json"
+            jq -r '"- missing core receipt: UNKNOWN \(.summary.unknown); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/missing-core-receipt/generation-report.json"
+            jq -r '"- invalid core decision: REFUTED \(.summary.refuted); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/invalid-core-decision/generation-report.json"
+            jq -r '"- mismatched core identities: \(.core_resolution.identity_match); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/core-identity-mismatch/generation-report.json"
             jq -r '"- missing meta activity: required UNKNOWN \(.patterns.unknown_required); cells \(.summary.closed)/\(.summary.total) CLOSED; first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/missing-meta-activity/generation-report.json"
             jq -r '"- unbound required pattern: \(.patterns.missing_required); \(.claim.reason)"' "$RUNNER_TEMP/unbound-pattern/generation-report.json"
             jq -r '"- captured external profile: \(.summary.closed)/\(.summary.total) CLOSED; meta nodes \(.summary.meta_activity_nodes); project nodes \(.summary.project_activity_nodes)"' "$RUNNER_TEMP/external-a/generation-report.json"
@@ -278,6 +321,9 @@ jobs:
             ${{ runner.temp }}/complete-b
             ${{ runner.temp }}/missing-activity
             ${{ runner.temp }}/duplicate-activity
+            ${{ runner.temp }}/missing-core-receipt
+            ${{ runner.temp }}/invalid-core-decision
+            ${{ runner.temp }}/core-identity-mismatch
             ${{ runner.temp }}/missing-meta-activity
             ${{ runner.temp }}/unbound-pattern
             ${{ runner.temp }}/external-a
@@ -295,3 +341,6 @@ jobs:
             ${{ runner.temp }}/semantic.json
             ${{ runner.temp }}/graph.json
             ${{ runner.temp }}/external-graph.json
+            ${{ runner.temp }}/resolved-meta-graph.json
+            ${{ runner.temp }}/resolved-project-graph.json
+            ${{ runner.temp }}/resolved-external-graph.json

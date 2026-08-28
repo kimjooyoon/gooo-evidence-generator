@@ -7,7 +7,7 @@
   "required_patterns": ["released-core-lock","fixed-denominator","gooo-activity-model","evaluator-contract","ci-evidence-artifact","contract-rfc","deterministic-replay","zero-source-write","explicit-unknown","explicit-refutation","fixture-bundle"],
   "conformance_checks": [
     {"ordinal":1,"id":"RELEASE_IDENTITY","expected":"PINNED_RELEASE_OBSERVED"},
-    {"ordinal":2,"id":"ACTIVITY_SET","expected":"ACTIVITY_BINDINGS_EQUAL_DENOMINATOR"},
+    {"ordinal":2,"id":"ACTIVITY_SET","expected":"CORE_RESOLUTION_RECEIPTS_EQUAL_DENOMINATOR"},
     {"ordinal":3,"id":"FIXED_DENOMINATOR","expected":"DECLARED_TOTAL_EQUALS_CELL_COUNT"},
     {"ordinal":4,"id":"DETERMINISTIC_REPLAY","expected":"BYTE_IDENTICAL_OUTPUT"},
     {"ordinal":5,"id":"ZERO_SOURCE_WRITE","expected":"SOURCE_REPOSITORY_WRITES_ZERO"},
