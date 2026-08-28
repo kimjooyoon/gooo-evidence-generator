@@ -45,6 +45,18 @@ the generator repository. External validity remains `0/2` until two public
 consumer repositories pin a released dual-graph generator and publish their
 own CI evidence.
 
+## Consumer release-lock compatibility
+
+The repository argument supplies the consumer's core release lock. Requiring
+the generator's exact schema ID or exact asset count would make the generator
+its own only valid consumer. V2 therefore accepts a structural family whose
+schema ends in `/core-release-lock/v1` and whose explicit repository, tag, tag
+object, target commit, asset names, and SHA-256 values are present. The Linux
+Gooo archive remains mandatory.
+
+CI covers the generator lock with one asset and the captured local-ledger lock
+shape with eight assets. It does not rewrite either lock into the other shape.
+
 ## Non-claims
 
 Graph separation does not prove that generated contracts are useful, that the

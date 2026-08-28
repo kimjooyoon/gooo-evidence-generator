@@ -169,6 +169,31 @@ jobs:
           ' "$RUNNER_TEMP/external-a/generation-report.json" >/dev/null
           jq -e '.decision=="GENERATION_VERIFIED" and .summary.closed==6 and .summary.total==6' "$RUNNER_TEMP/external-verification.json" >/dev/null
 
+          compatibility_repository="$RUNNER_TEMP/local-ledger-lock-repository"
+          mkdir -p "$compatibility_repository/contracts"
+          jq -S -n \
+            --slurpfile base "$GITHUB_WORKSPACE/contracts/core-release-lock-v1.json" \
+            --slurpfile release "$RUNNER_TEMP/release.json" '
+            ($base[0]) as $base |
+            {
+              schema:"gooo/local-ledger/core-release-lock/v1",
+              repository:$base.repository,
+              tag:$base.tag,
+              tag_object_sha:$base.tag_object_sha,
+              target_commit_sha:$base.target_commit_sha,
+              assets:[$release[0].assets[] | {
+                name:.name,
+                sha256:(.digest | sub("^sha256:";""))
+              }]
+            }
+          ' > "$compatibility_repository/contracts/core-release-lock-v1.json"
+          jq -e '.schema=="gooo/local-ledger/core-release-lock/v1" and (.assets|length)==8' "$compatibility_repository/contracts/core-release-lock-v1.json" >/dev/null
+          bash scripts/generate.sh "$compatibility_repository" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/compatible-core-lock" "$SUBJECT_SHA" compatible-local-ledger-core-lock
+          bash scripts/verify.sh "$RUNNER_TEMP/compatible-core-lock" "$RUNNER_TEMP/compatible-core-lock-verification.json"
+          jq -e '.decision=="PROJECT_GENERATED" and .summary.closed==12 and .patterns.promoted==11' "$RUNNER_TEMP/compatible-core-lock/generation-report.json" >/dev/null
+          jq -e '.schema=="gooo/local-ledger/core-release-lock/v1" and (.assets|length)==8' "$RUNNER_TEMP/compatible-core-lock/contracts/core-release-lock-v1.json" >/dev/null
+          jq -e '.decision=="GENERATION_VERIFIED" and .summary.closed==6 and .summary.total==6' "$RUNNER_TEMP/compatible-core-lock-verification.json" >/dev/null
+
       - name: Publish exact indicators and enforce zero source writes
         shell: bash
         run: |
@@ -193,6 +218,7 @@ jobs:
               generator:{peak_rss_kib:$peak_rss_kib,wall_ms:$wall_ms},
               repository:{before_digest:$before,after_digest:$after,writes:$writes},
               deterministic_replay:true,captured_external_profiles:1,independent_public_consumers:0,
+              core_lock_schema_variants:2,core_lock_asset_counts:[1,8],
               local_tests_run:0}' > "$RUNNER_TEMP/runtime.json"
           jq -e '.repository.writes==0 and .repository.before_digest==.repository.after_digest and .deterministic_replay==true and .local_tests_run==0' "$RUNNER_TEMP/runtime.json" >/dev/null
 
@@ -207,6 +233,7 @@ jobs:
             jq -r '"- missing meta activity: required UNKNOWN \(.patterns.unknown_required); cells \(.summary.closed)/\(.summary.total) CLOSED; first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/missing-meta-activity/generation-report.json"
             jq -r '"- unbound required pattern: \(.patterns.missing_required); \(.claim.reason)"' "$RUNNER_TEMP/unbound-pattern/generation-report.json"
             jq -r '"- captured external profile: \(.summary.closed)/\(.summary.total) CLOSED; meta nodes \(.summary.meta_activity_nodes); project nodes \(.summary.project_activity_nodes)"' "$RUNNER_TEMP/external-a/generation-report.json"
+            jq -r '"- consumer core lock: \(.summary.closed)/\(.summary.total) CLOSED; patterns \(.patterns.promoted)"' "$RUNNER_TEMP/compatible-core-lock/generation-report.json"
             jq -r '"- generated digest verification: \(.summary.closed)/\(.summary.total); REFUTED \(.summary.refuted)"' "$RUNNER_TEMP/drift-verification.json"
             jq -r '"- repository writes: \(.repository.writes)","- deterministic replay: \(.deterministic_replay)","- local test executions: \(.local_tests_run)","- observed peak RSS: \(.generator.peak_rss_kib) KiB","- observed wall time: \(.generator.wall_ms) ms"' "$RUNNER_TEMP/runtime.json"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -227,6 +254,8 @@ jobs:
             ${{ runner.temp }}/external-a
             ${{ runner.temp }}/external-b
             ${{ runner.temp }}/external-verification.json
+            ${{ runner.temp }}/compatible-core-lock
+            ${{ runner.temp }}/compatible-core-lock-verification.json
             ${{ runner.temp }}/verification.json
             ${{ runner.temp }}/drift-verification.json
             ${{ runner.temp }}/runtime.json

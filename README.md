@@ -75,3 +75,16 @@ generator. This captured fixture is evidence for graph separation, not one of
 the required two independent public consumer adoptions.
 
 See [the v2 RFC](docs/rfcs/separate-meta-project-graphs-v2.md).
+
+### Consumer lock compatibility
+
+The generator validates the semantic release identity rather than requiring its
+own lock-file shape. CI covers two valid lock contracts:
+
+- `gooo/core-release-lock/v1` with `1` pinned Linux asset;
+- `gooo/local-ledger/core-release-lock/v1` with all `8` release assets.
+
+Both must produce `12/12 CLOSED`, `11` promoted patterns, and `6/6` verified
+manifest entries. A lock is accepted only when its schema ends in
+`/core-release-lock/v1`, its tag and commit identities are explicit, every
+asset has a SHA-256 digest, and a Linux Gooo archive is present.
