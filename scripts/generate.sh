@@ -32,6 +32,7 @@ if [ -n "$(find "$output_real" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
 fi
 
 jq -e '
+  . as $d |
   .schema == "gooo/evidence-generator/denominator/v1" and
   .target_cells > 0 and .target_cells == (.cells | length) and
   ([.cells[].ordinal] == [range(1; .target_cells + 1)]) and
@@ -41,8 +42,9 @@ jq -e '
   ([.proof_totals[].total] | add) == .target_cells and
   ([.indicator_totals[].indicator_class] | sort) == ["DRIVER","GUARDRAIL","OUTCOME"] and
   ([.indicator_totals[].total] | add) == .target_cells and
-  all(.indicator_totals[] as $indicator;
-    ([.cells[]|select(.indicator_class==$indicator.indicator_class)]|length)==$indicator.total)
+  all($d.indicator_totals[];
+    . as $indicator |
+    ([$d.cells[]|select(.indicator_class==$indicator.indicator_class)]|length)==$indicator.total)
 ' "$denominator" >/dev/null
 
 jq -e '
