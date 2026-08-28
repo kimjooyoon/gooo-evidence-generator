@@ -75,11 +75,11 @@ jobs:
 
           jq -S '
             [.patterns[]|select(.meta_activity!=null)] | to_entries |
-            {schema:"gooo/evidence-generator/activity-selector-set/v1",role:"meta_graph",selectors:[.[]|{ordinal:(.key+1),id:.value.id,activity:.value.meta_activity}]}
+            {schema:"gooo/evidence-generator/activity-selector-set/v1",role:"meta_graph",selectors:[.[]|{ordinal:(.key+1),id:.value.id,activity:.value.meta_activity,selector:{name:.value.meta_activity}}]}
           ' contracts/repetition-observation-v1.json > "$RUNNER_TEMP/meta-selectors.json"
-          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"project_graph",selectors:[.cells[]|{ordinal,id,activity}]}' \
+          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"project_graph",selectors:[.cells[]|{ordinal,id,activity,selector:{name:.activity}}]}' \
             contracts/evidence-generator-denominator-v1.json > "$RUNNER_TEMP/project-selectors.json"
-          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"project_graph",selectors:[.cells[]|{ordinal,id,activity}]}' \
+          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"project_graph",selectors:[.cells[]|{ordinal,id,activity,selector:{name:.activity}}]}' \
             contracts/external-ledger-denominator-v1.json > "$RUNNER_TEMP/external-selectors.json"
           binder=scripts/bind-activity-resolutions.sh
           core_lock=contracts/core-release-lock-v1.json
@@ -141,11 +141,9 @@ jobs:
             .claim.unknown_class=="DIRECT_MISSING"
           ' "$RUNNER_TEMP/missing-activity/generation-report.json" >/dev/null
 
-          cp examples/self-hosted-generator/main.gooo "$RUNNER_TEMP/duplicate-source.gooo"
-          grep '^activity PublishGenerationReceipt(' examples/self-hosted-generator/main.gooo >> "$RUNNER_TEMP/duplicate-source.gooo"
-          "$GOOO_BIN" graph dump "$RUNNER_TEMP/duplicate-source.gooo" > "$RUNNER_TEMP/duplicate-graph.json"
-          bash scripts/bind-activity-resolutions.sh "$GOOO_BIN" "$RUNNER_TEMP/duplicate-source.gooo" "$RUNNER_TEMP/duplicate-graph.json" "$RUNNER_TEMP/project-selectors.json" contracts/core-release-lock-v1.json "$RUNNER_TEMP/duplicate-resolved-project-graph.json" project_graph
-          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/duplicate-resolved-project-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/duplicate-activity" "$SUBJECT_SHA" duplicate-publish-activity
+          jq '(.selectors[]|select(.id=="GENERATION_RECEIPT")|.selector)={namespace:"evidencegenerator"}' "$RUNNER_TEMP/project-selectors.json" > "$RUNNER_TEMP/ambiguous-project-selectors.json"
+          bash scripts/bind-activity-resolutions.sh "$GOOO_BIN" examples/self-hosted-generator/main.gooo "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/ambiguous-project-selectors.json" contracts/core-release-lock-v1.json "$RUNNER_TEMP/ambiguous-resolved-project-graph.json" project_graph
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/resolved-meta-graph.json" "$RUNNER_TEMP/ambiguous-resolved-project-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/duplicate-activity" "$SUBJECT_SHA" ambiguous-publish-selector
           jq -e '
             .decision=="FAIL_CLOSED" and .summary.closed==9 and .summary.unknown==0 and .summary.refuted==3 and
             .patterns.missing_required==0 and .patterns.unknown_required==0 and .patterns.refuted_required==0 and

@@ -25,7 +25,11 @@ jq -e --arg role "$role" '
   .role==$role and (.selectors|length)>0 and
   ([.selectors[].ordinal]==[range(1;(.selectors|length)+1)]) and
   ([.selectors[].id]|unique|length)==(.selectors|length) and
-  ([.selectors[].activity]|unique|length)==(.selectors|length)
+  ([.selectors[].activity]|unique|length)==(.selectors|length) and
+  all(.selectors[];
+    (.selector|type)=="object" and
+    ((.selector|keys_unsorted)-["name","namespace","id_prefix"]|length)==0 and
+    ([.selector.name?,.selector.namespace?,.selector.id_prefix?]|map(select(type=="string" and length>0))|length)>0)
 ' "$selectors" >/dev/null
 jq -e '.schema_version=="gooo-graph/v1" and .ir.status=="available"' "$graph" >/dev/null
 jq -e '
@@ -39,16 +43,24 @@ work=$(mktemp -d)
 trap 'rm -r "$work"' EXIT
 mkdir -p "$work/entries"
 
-while IFS=$'\t' read -r ordinal id activity; do
+while IFS=$'\t' read -r ordinal id activity selector_base64; do
   printf -v receipt '%s/receipt-%04d.json' "$work" "$ordinal"
-  if "$gooo" graph resolve-activity "$source_file" --name "$activity" > "$receipt"; then
+  selector=$(printf '%s' "$selector_base64" | base64 -d)
+  args=()
+  name=$(jq -r '.name // empty' <<<"$selector")
+  namespace=$(jq -r '.namespace // empty' <<<"$selector")
+  id_prefix=$(jq -r '.id_prefix // empty' <<<"$selector")
+  if [ -n "$name" ]; then args+=(--name "$name"); fi
+  if [ -n "$namespace" ]; then args+=(--namespace "$namespace"); fi
+  if [ -n "$id_prefix" ]; then args+=(--id-prefix "$id_prefix"); fi
+  if "$gooo" graph resolve-activity "$source_file" "${args[@]}" > "$receipt"; then
     status=0
   else
     status=$?
   fi
-  jq -e --arg activity "$activity" --arg source_file "$source_file" --slurpfile graph "$graph" '
+  jq -e --argjson selector "$selector" --arg source_file "$source_file" --slurpfile graph "$graph" '
     .schema=="gooo/activity-cardinality-resolution/v1" and
-    .selector.name==$activity and .subject.source_file==$source_file and
+    .selector==$selector and .subject.source_file==$source_file and
     .subject.source_digest==$graph[0].source_digest and
     .subject.semantic_digest==$graph[0].ir.semantic_digest and
     ((.decision=="CLOSED" and .claim.state=="CLOSED" and .occurrences==1 and (.matches|length)==1 and
@@ -66,11 +78,11 @@ while IFS=$'\t' read -r ordinal id activity; do
   ' "$receipt" >/dev/null
   decision=$(jq -r '.decision' "$receipt")
   if [ "$decision" = "CLOSED" ]; then test "$status" -eq 0; else test "$status" -ne 0; fi
-  jq -S -n --argjson ordinal "$ordinal" --arg id "$id" --arg activity "$activity" \
+  jq -S -n --argjson ordinal "$ordinal" --arg id "$id" --arg activity "$activity" --argjson selector "$selector" \
     --slurpfile receipt "$receipt" \
-    '{ordinal:$ordinal,id:$id,activity:$activity,receipt:$receipt[0]}' \
+    '{ordinal:$ordinal,id:$id,activity:$activity,selector:$selector,receipt:$receipt[0]}' \
     > "$work/entries/$(printf '%04d' "$ordinal").json"
-done < <(jq -r '.selectors[]|[.ordinal,.id,.activity]|@tsv' "$selectors")
+done < <(jq -r '.selectors[]|[.ordinal,.id,.activity,(.selector|@base64)]|@tsv' "$selectors")
 
 jq -S -s '.' "$work"/entries/*.json > "$work/entries.json"
 selector_digest=$(sha256sum "$selectors" | awk '{print $1}')

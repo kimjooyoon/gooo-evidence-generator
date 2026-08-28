@@ -136,7 +136,7 @@ jq -S -n \
     else
       ($entries[0].receipt) as $receipt |
       if $receipt.schema!="gooo/activity-cardinality-resolution/v1" or
-        $receipt.selector.name!=$activity or
+        $receipt.selector!=$entries[0].selector or
         $receipt.subject.source_digest!=$graph.source_digest or
         $receipt.subject.semantic_digest!=$graph.ir.semantic_digest then
         {state:"REFUTED",decision:($receipt.decision // null),occurrences:($receipt.occurrences // null),stage:"RESOLUTION_OBSERVATION",step:"VALIDATE_CORE_ACTIVITY_RESOLUTION_RECEIPT",reason:"INVALID_CORE_ACTIVITY_RESOLUTION_RECEIPT",next_operation:"RESTORE_CORE_ACTIVITY_RESOLUTION_RECEIPT",unknown_class:null}
