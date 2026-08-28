@@ -1,0 +1,193 @@
+name: Evidence generator conformance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Bind exact subject identity
+        run: echo "SUBJECT_SHA=${{ github.event.pull_request.head.sha || github.sha }}" >> "$GITHUB_ENV"
+
+      - name: Observe and download released Gooo
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock=contracts/core-release-lock-v1.json
+          tag=$(jq -r '.tag' "$lock")
+          expected_tag_object=$(jq -r '.tag_object_sha' "$lock")
+          expected_target=$(jq -r '.target_commit_sha' "$lock")
+          asset_name=$(jq -r '.assets[0].name' "$lock")
+          expected_digest=$(jq -r '.assets[0].sha256' "$lock")
+
+          gh api "repos/kimjooyoon/meta-ontology-go/git/ref/tags/$tag" > "$RUNNER_TEMP/tag-ref.json"
+          jq -e --arg sha "$expected_tag_object" '.object.type=="tag" and .object.sha==$sha' "$RUNNER_TEMP/tag-ref.json" >/dev/null
+          gh api "repos/kimjooyoon/meta-ontology-go/git/tags/$expected_tag_object" > "$RUNNER_TEMP/tag-object.json"
+          jq -e --arg sha "$expected_target" '.object.type=="commit" and .object.sha==$sha' "$RUNNER_TEMP/tag-object.json" >/dev/null
+
+          gh api "repos/kimjooyoon/meta-ontology-go/releases/tags/$tag" > "$RUNNER_TEMP/release.json"
+          asset_id=$(jq -r --arg name "$asset_name" '.assets[] | select(.name==$name) | .id' "$RUNNER_TEMP/release.json")
+          test -n "$asset_id"
+          gh api -H 'Accept: application/octet-stream' "repos/kimjooyoon/meta-ontology-go/releases/assets/$asset_id" > "$RUNNER_TEMP/gooo"
+          printf '%s  %s\n' "$expected_digest" "$RUNNER_TEMP/gooo" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/gooo"
+          echo "GOOO_BIN=$RUNNER_TEMP/gooo" >> "$GITHUB_ENV"
+
+      - name: Observe released graph and source effect
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file=examples/self-hosted-generator/main.gooo
+          snapshot() {
+            find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -print0 |
+              sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+          }
+          before=$(snapshot)
+          printf '%s\n' "$before" > "$RUNNER_TEMP/repository-before"
+          "$GOOO_BIN" version --json > "$RUNNER_TEMP/version.json"
+          "$GOOO_BIN" check --json "$source_file" > "$RUNNER_TEMP/syntax.json"
+          "$GOOO_BIN" check --semantic --json "$source_file" > "$RUNNER_TEMP/semantic.json"
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/graph-rss" \
+            "$GOOO_BIN" graph --json "$source_file" > "$RUNNER_TEMP/graph.json"
+          jq -e '.schema_version=="gooo-version/v1" and .language=="gooo"' "$RUNNER_TEMP/version.json" >/dev/null
+          jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok"' "$RUNNER_TEMP/syntax.json" >/dev/null
+          jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok" and .semantic_hash!=null' "$RUNNER_TEMP/semantic.json" >/dev/null
+          jq -e '.schema_version=="gooo-graph/v1" and ([.nodes[]|select(.kind=="Activity")]|length)==12' "$RUNNER_TEMP/graph.json" >/dev/null
+
+      - name: Generate complete and adversarial bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          denominator="$GITHUB_WORKSPACE/contracts/evidence-generator-denominator-v1.json"
+          observation="$GITHUB_WORKSPACE/contracts/repetition-observation-v1.json"
+          profile="$GITHUB_WORKSPACE/fixtures/self-hosted-generator/project.json"
+
+          start_ns=$(date +%s%N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/generator-rss" \
+            bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/complete-a" "$SUBJECT_SHA" complete
+          end_ns=$(date +%s%N)
+          echo $(( (end_ns-start_ns)/1000000 )) > "$RUNNER_TEMP/generator-wall-ms"
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/complete-b" "$SUBJECT_SHA" complete
+          diff -qr "$RUNNER_TEMP/complete-a" "$RUNNER_TEMP/complete-b"
+          bash scripts/verify.sh "$RUNNER_TEMP/complete-a" "$RUNNER_TEMP/verification.json"
+
+          jq -e '
+            .decision=="PROJECT_GENERATED" and
+            .summary.closed==12 and .summary.unknown==0 and .summary.refuted==0 and
+            .summary.direct_missing==0 and .summary.dependency_blocked==0 and
+            .patterns.observed==12 and .patterns.support_eligible==12 and
+            .patterns.meta_bound==11 and .patterns.promoted==11 and
+            .patterns.excluded_without_meta==1 and .patterns.required==11 and
+            .patterns.missing_required==0 and
+            .authority.root_readme_readiness=="EXCLUDED" and
+            ([.proofs[]|select(.closed==4 and .total==4)]|length)==3 and
+            .claim.state=="CLOSED"
+          ' "$RUNNER_TEMP/complete-a/generation-report.json" >/dev/null
+          jq -e '.tracked_file_count==6 and (.files|length)==6' "$RUNNER_TEMP/complete-a/generation-manifest.json" >/dev/null
+          test "$(find "$RUNNER_TEMP/complete-a" -type f | wc -l)" -eq 7
+          jq -e '.decision=="GENERATION_VERIFIED" and .summary.total==6 and .summary.closed==6 and .summary.unknown==0 and .summary.refuted==0 and .summary.actual_output_files==7' "$RUNNER_TEMP/verification.json" >/dev/null
+
+          jq '.nodes |= map(select(.name!="PublishGenerationReceipt"))' "$RUNNER_TEMP/graph.json" > "$RUNNER_TEMP/missing-graph.json"
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/missing-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/missing-activity" "$SUBJECT_SHA" missing-publish-activity
+          jq -e '
+            .decision=="INCOMPLETE" and .summary.closed==9 and .summary.unknown==3 and .summary.refuted==0 and
+            .summary.direct_missing==1 and .summary.dependency_blocked==2 and
+            .claim.stage=="GENERATION" and .claim.step=="PUBLISH_GENERATION_RECEIPT" and
+            .claim.reason=="GENERATION_RECEIPT_ACTIVITY_UNAVAILABLE" and
+            .claim.unknown_class=="DIRECT_MISSING"
+          ' "$RUNNER_TEMP/missing-activity/generation-report.json" >/dev/null
+
+          jq '(.nodes[] | select(.kind=="Activity" and .name=="PublishGenerationReceipt")) as $node | .nodes += [($node | .id = (.id + "-duplicate"))]' "$RUNNER_TEMP/graph.json" > "$RUNNER_TEMP/duplicate-graph.json"
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/duplicate-graph.json" "$denominator" "$observation" "$profile" "$RUNNER_TEMP/duplicate-activity" "$SUBJECT_SHA" duplicate-publish-activity
+          jq -e '
+            .decision=="FAIL_CLOSED" and .summary.closed==9 and .summary.unknown==0 and .summary.refuted==3 and
+            .claim.stage=="GENERATION" and .claim.step=="PUBLISH_GENERATION_RECEIPT" and
+            .claim.reason=="AMBIGUOUS_ACTIVITY_BINDING"
+          ' "$RUNNER_TEMP/duplicate-activity/generation-report.json" >/dev/null
+
+          jq '.required_patterns += ["root-readme"]' "$profile" > "$RUNNER_TEMP/unbound-profile.json"
+          bash scripts/generate.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/graph.json" "$denominator" "$observation" "$RUNNER_TEMP/unbound-profile.json" "$RUNNER_TEMP/unbound-pattern" "$SUBJECT_SHA" unbound-required-pattern
+          jq -e '
+            .decision=="FAIL_CLOSED" and .summary.closed==12 and .summary.unknown==0 and .summary.refuted==0 and
+            .patterns.missing_required==1 and .patterns.missing_required_ids==["root-readme"] and
+            .claim.stage=="PROMOTION" and .claim.step=="REQUIRE_META_BOUND_PATTERN" and
+            .claim.reason=="REQUIRED_PATTERN_NOT_PROMOTED"
+          ' "$RUNNER_TEMP/unbound-pattern/generation-report.json" >/dev/null
+
+          cp -R "$RUNNER_TEMP/complete-a" "$RUNNER_TEMP/generated-drift"
+          printf '\n' >> "$RUNNER_TEMP/generated-drift/contracts/evidence-denominator-v1.json"
+          bash scripts/verify.sh "$RUNNER_TEMP/generated-drift" "$RUNNER_TEMP/drift-verification.json"
+          jq -e '
+            .decision=="FAIL_CLOSED" and .summary.total==6 and .summary.closed==5 and .summary.refuted==1 and
+            .claim.stage=="DIGEST" and .claim.step=="VERIFY_GENERATED_FILE_DIGEST" and
+            .claim.reason=="GENERATED_FILE_DIGEST_MISMATCH"
+          ' "$RUNNER_TEMP/drift-verification.json" >/dev/null
+
+      - name: Publish exact indicators and enforce zero source writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot() {
+            find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -print0 |
+              sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+          }
+          before=$(cat "$RUNNER_TEMP/repository-before")
+          after=$(snapshot)
+          if [ "$before" = "$after" ]; then writes=0; else writes=1; fi
+          peak_rss_kib=$(cat "$RUNNER_TEMP/generator-rss")
+          wall_ms=$(cat "$RUNNER_TEMP/generator-wall-ms")
+          jq -S -n \
+            --arg subject_sha "$SUBJECT_SHA" \
+            --arg before "$before" \
+            --arg after "$after" \
+            --argjson writes "$writes" \
+            --argjson peak_rss_kib "$peak_rss_kib" \
+            --argjson wall_ms "$wall_ms" \
+            '{schema:"gooo/evidence-generator/runtime/v1",subject_sha:$subject_sha,
+              generator:{peak_rss_kib:$peak_rss_kib,wall_ms:$wall_ms},
+              repository:{before_digest:$before,after_digest:$after,writes:$writes},
+              deterministic_replay:true,local_tests_run:0}' > "$RUNNER_TEMP/runtime.json"
+          jq -e '.repository.writes==0 and .repository.before_digest==.repository.after_digest and .deterministic_replay==true and .local_tests_run==0' "$RUNNER_TEMP/runtime.json" >/dev/null
+
+          {
+            echo '## Gooo evidence generator'
+            jq -r '"- generation: \(.summary.closed)/\(.summary.total) CLOSED; UNKNOWN \(.summary.unknown); REFUTED \(.summary.refuted)",
+              "- patterns: \(.patterns.promoted)/\(.patterns.observed) promoted; without meta \(.patterns.excluded_without_meta)",
+              "- generated files: \(.summary.expected_output_files)",
+              "- README readiness authority: \(.authority.root_readme_readiness)"' "$RUNNER_TEMP/complete-a/generation-report.json"
+            jq -r '"- missing activity: direct \(.summary.direct_missing); dependency blocked \(.summary.dependency_blocked); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/missing-activity/generation-report.json"
+            jq -r '"- duplicate activity: refuted \(.summary.refuted); first \(.claim.stage) / \(.claim.step) / \(.claim.reason)"' "$RUNNER_TEMP/duplicate-activity/generation-report.json"
+            jq -r '"- unbound required pattern: \(.patterns.missing_required); \(.claim.reason)"' "$RUNNER_TEMP/unbound-pattern/generation-report.json"
+            jq -r '"- generated digest verification: \(.summary.closed)/\(.summary.total); REFUTED \(.summary.refuted)"' "$RUNNER_TEMP/drift-verification.json"
+            jq -r '"- repository writes: \(.repository.writes)","- deterministic replay: \(.deterministic_replay)","- local test executions: \(.local_tests_run)","- observed peak RSS: \(.generator.peak_rss_kib) KiB","- observed wall time: \(.generator.wall_ms) ms"' "$RUNNER_TEMP/runtime.json"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload generator evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: evidence-generator-${{ github.event.pull_request.head.sha || github.sha }}
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/complete-a
+            ${{ runner.temp }}/complete-b
+            ${{ runner.temp }}/missing-activity
+            ${{ runner.temp }}/duplicate-activity
+            ${{ runner.temp }}/unbound-pattern
+            ${{ runner.temp }}/verification.json
+            ${{ runner.temp }}/drift-verification.json
+            ${{ runner.temp }}/runtime.json
+            ${{ runner.temp }}/version.json
+            ${{ runner.temp }}/syntax.json
+            ${{ runner.temp }}/semantic.json
+            ${{ runner.temp }}/graph.json

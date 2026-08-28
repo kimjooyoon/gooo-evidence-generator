@@ -1,0 +1,13 @@
+{
+  "schema": "gooo/core-release-lock/v1",
+  "repository": "kimjooyoon/meta-ontology-go",
+  "tag": "v0.1.0-dev",
+  "tag_object_sha": "b0f6d7efcd6f6a2f8da177781a2cd8cef9defa31",
+  "target_commit_sha": "cf07bc02cda5cc0a05019d2ad63faeb3fa9edb28",
+  "assets": [
+    {
+      "name": "gooo-linux-amd64",
+      "sha256": "1995a3243845531e58260e2865ac75552a6c36925e24ee49dc162c64f62f27b4"
+    }
+  ]
+}
