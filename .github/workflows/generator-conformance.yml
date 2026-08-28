@@ -191,6 +191,35 @@ jobs:
           jq -e '.schema=="gooo/local-ledger/core-release-lock/v1" and (.assets|length)==8 and all(.assets[];has("digest") and (has("sha256")|not))' "$RUNNER_TEMP/compatible-core-lock/contracts/core-release-lock-v1.json" >/dev/null
           jq -e '.decision=="GENERATION_VERIFIED" and .summary.closed==6 and .summary.total==6' "$RUNNER_TEMP/compatible-core-lock-verification.json" >/dev/null
 
+          nested_repository="$RUNNER_TEMP/design-evidence-lock-repository"
+          mkdir -p "$nested_repository/contracts"
+          jq -S -n \
+            --slurpfile base "$GITHUB_WORKSPACE/contracts/core-release-lock-v1.json" \
+            --slurpfile release "$RUNNER_TEMP/release.json" '
+            ($base[0]) as $base |
+            {
+              schema:"gooo/core-release-lock/v1",
+              repository:$base.repository,
+              release:{
+                tag:$base.tag,
+                tag_object:{type:"tag",sha:$base.tag_object_sha},
+                target:{type:"commit",sha:$base.target_commit_sha},
+                draft:false,prerelease:true,immutable:false,
+                assets:[$release[0].assets[] | {name:.name,size:.size,digest:.digest}]
+              },
+              runtime:{platform:"linux-amd64",archive:"gooo-linux-amd64.tar.gz",
+                checksums:"SHA256SUMS",version_schema:"gooo-version/v1",
+                check_schema:"gooo/diagnostics/v1"}
+            }
+          ' > "$nested_repository/contracts/core-release-lock-v1.json"
+          jq -e 'has("assets")|not' "$nested_repository/contracts/core-release-lock-v1.json" >/dev/null
+          jq -e '.release.tag_object.type=="tag" and .release.target.type=="commit" and (.release.assets|length)==8' "$nested_repository/contracts/core-release-lock-v1.json" >/dev/null
+          bash scripts/generate.sh "$nested_repository" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/external-graph.json" "$external_denominator" "$observation" "$external_profile" "$RUNNER_TEMP/nested-core-lock" "$SUBJECT_SHA" compatible-design-evidence-core-lock
+          bash scripts/verify.sh "$RUNNER_TEMP/nested-core-lock" "$RUNNER_TEMP/nested-core-lock-verification.json"
+          jq -e '.decision=="PROJECT_GENERATED" and .summary.closed==12 and .patterns.promoted==11' "$RUNNER_TEMP/nested-core-lock/generation-report.json" >/dev/null
+          jq -e '(has("assets")|not) and .release.tag_object.type=="tag" and .release.target.type=="commit" and (.release.assets|length)==8' "$RUNNER_TEMP/nested-core-lock/contracts/core-release-lock-v1.json" >/dev/null
+          jq -e '.decision=="GENERATION_VERIFIED" and .summary.closed==6 and .summary.total==6' "$RUNNER_TEMP/nested-core-lock-verification.json" >/dev/null
+
       - name: Publish exact indicators and enforce zero source writes
         shell: bash
         run: |
@@ -215,7 +244,8 @@ jobs:
               generator:{peak_rss_kib:$peak_rss_kib,wall_ms:$wall_ms},
               repository:{before_digest:$before,after_digest:$after,writes:$writes},
               deterministic_replay:true,captured_external_profiles:1,independent_public_consumers:0,
-              core_lock_schema_variants:2,core_lock_asset_counts:[1,8],
+              core_lock_schema_variants:2,core_lock_structure_variants:["flat","nested"],
+              core_lock_asset_counts:[1,8,8],
               core_lock_digest_vocabularies:["sha256","digest"],
               local_tests_run:0}' > "$RUNNER_TEMP/runtime.json"
           jq -e '.repository.writes==0 and .repository.before_digest==.repository.after_digest and .deterministic_replay==true and .local_tests_run==0' "$RUNNER_TEMP/runtime.json" >/dev/null
@@ -232,6 +262,7 @@ jobs:
             jq -r '"- unbound required pattern: \(.patterns.missing_required); \(.claim.reason)"' "$RUNNER_TEMP/unbound-pattern/generation-report.json"
             jq -r '"- captured external profile: \(.summary.closed)/\(.summary.total) CLOSED; meta nodes \(.summary.meta_activity_nodes); project nodes \(.summary.project_activity_nodes)"' "$RUNNER_TEMP/external-a/generation-report.json"
             jq -r '"- consumer core lock: \(.summary.closed)/\(.summary.total) CLOSED; patterns \(.patterns.promoted)"' "$RUNNER_TEMP/compatible-core-lock/generation-report.json"
+            jq -r '"- nested consumer core lock: \(.summary.closed)/\(.summary.total) CLOSED; patterns \(.patterns.promoted)"' "$RUNNER_TEMP/nested-core-lock/generation-report.json"
             jq -r '"- generated digest verification: \(.summary.closed)/\(.summary.total); REFUTED \(.summary.refuted)"' "$RUNNER_TEMP/drift-verification.json"
             jq -r '"- repository writes: \(.repository.writes)","- deterministic replay: \(.deterministic_replay)","- local test executions: \(.local_tests_run)","- observed peak RSS: \(.generator.peak_rss_kib) KiB","- observed wall time: \(.generator.wall_ms) ms"' "$RUNNER_TEMP/runtime.json"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -254,6 +285,8 @@ jobs:
             ${{ runner.temp }}/external-verification.json
             ${{ runner.temp }}/compatible-core-lock
             ${{ runner.temp }}/compatible-core-lock-verification.json
+            ${{ runner.temp }}/nested-core-lock
+            ${{ runner.temp }}/nested-core-lock-verification.json
             ${{ runner.temp }}/verification.json
             ${{ runner.temp }}/drift-verification.json
             ${{ runner.temp }}/runtime.json

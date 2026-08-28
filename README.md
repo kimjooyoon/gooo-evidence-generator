@@ -92,3 +92,12 @@ Both must produce `12/12 CLOSED`, `11` promoted patterns, and `6/6` verified
 manifest entries. A lock is accepted only when its schema ends in
 `/core-release-lock/v1`, its tag and commit identities are explicit, every
 asset has a SHA-256 digest, and a Linux Gooo archive is present.
+
+Release identity may be serialized in either of two structures:
+
+- flat: `tag`, `tag_object_sha`, `target_commit_sha`, and `assets`;
+- nested: `release.tag`, `release.tag_object.sha`, `release.target.sha`, and
+  `release.assets`.
+
+CI preserves both structures byte-for-byte within each generated bundle. The
+generator normalizes only the fields needed for validation.

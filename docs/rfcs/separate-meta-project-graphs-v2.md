@@ -60,6 +60,12 @@ The former carries raw hexadecimal in `sha256`; the latter carries the
 algorithm-qualified value in `digest`. Validation normalizes those values only
 for comparison and preserves the original field vocabulary in generated output.
 
+Design-evidence supplies a third valid lock shape whose release identity and
+eight assets are nested under `release`, with runtime asset selection under
+`runtime`. The generator reads both flat and nested identity structures but
+copies the complete consumer lock unchanged. CI requires `12/12` generation and
+`6/6` manifest verification for all three lock fixtures.
+
 ## Non-claims
 
 Graph separation does not prove that generated contracts are useful, that the

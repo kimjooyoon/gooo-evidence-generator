@@ -67,16 +67,21 @@ jq -e '
     if (.sha256? | type) == "string" then .sha256
     elif (.digest? | type) == "string" then (.digest | sub("^sha256:";""))
     else "" end;
-  (.schema | type) == "string" and (.schema | endswith("/core-release-lock/v1")) and
-  (.repository | type) == "string" and (.repository | length) > 0 and
-  (.tag | type) == "string" and (.tag | length) > 0 and
-  (.tag_object_sha | type) == "string" and (.tag_object_sha | test("^[0-9a-f]{40,64}$")) and
-  (.target_commit_sha | type) == "string" and (.target_commit_sha | test("^[0-9a-f]{40,64}$")) and
-  (.assets | type) == "array" and (.assets | length) > 0 and
-  all(.assets[];
+  . as $lock |
+  ($lock.tag // $lock.release.tag // "") as $tag |
+  ($lock.tag_object_sha // $lock.release.tag_object.sha // "") as $tag_object_sha |
+  ($lock.target_commit_sha // $lock.release.target.sha // "") as $target_commit_sha |
+  ($lock.assets // $lock.release.assets // []) as $assets |
+  ($lock.schema | type) == "string" and ($lock.schema | endswith("/core-release-lock/v1")) and
+  ($lock.repository | type) == "string" and ($lock.repository | length) > 0 and
+  ($tag | type) == "string" and ($tag | length) > 0 and
+  ($tag_object_sha | type) == "string" and ($tag_object_sha | test("^[0-9a-f]{40,64}$")) and
+  ($target_commit_sha | type) == "string" and ($target_commit_sha | test("^[0-9a-f]{40,64}$")) and
+  ($assets | type) == "array" and ($assets | length) > 0 and
+  all($assets[];
     (.name | type) == "string" and (.name | length) > 0 and
     (asset_sha256 | test("^[0-9a-f]{64}$"))) and
-  any(.assets[]; .name == "gooo-linux-amd64.tar.gz")
+  any($assets[]; .name == "gooo-linux-amd64.tar.gz")
 ' "$repository/contracts/core-release-lock-v1.json" >/dev/null
 
 mkdir -p \
