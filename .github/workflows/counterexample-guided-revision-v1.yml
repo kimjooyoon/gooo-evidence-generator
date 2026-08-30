@@ -226,7 +226,7 @@ jobs:
             echo '## Counterexample-guided revision v1'
             jq -r '"- normal proposal: \(.decision); cells \(.summary.closed) CLOSED / \(.summary.unknown) UNKNOWN / \(.summary.refuted) REFUTED; input claim promoted \(.input_claim_promoted)",
               "- improvement: \(.improvement_claim.state) (exact before/after pair absent)",
-              "- causal frontier: \(.claim.state) \(.claim.stage)/\(.claim.step) \(.claim.unknown_class // \"NONE\")"' "$RUNNER_TEMP/normal-a/evaluation.json"
+              "- causal frontier: \(.claim.state) \(.claim.stage)/\(.claim.step) \(.claim.unknown_class)"' "$RUNNER_TEMP/normal-a/evaluation.json"
             jq -r '"- scenarios: normal 1; UNKNOWN 5; REFUTED 5; replay 2", "- evaluator: \(.performance.normal_evaluator_wall_ms) ms / \(.performance.normal_evaluator_peak_rss_kib) KiB peak RSS", "- inventory: Go \(.inventory.input_go_files) files / \(.inventory.input_go_physical_lines) lines; Gooo \(.inventory.input_gooo_files) files / \(.inventory.input_gooo_physical_lines) lines", "- tree: \(.inventory.input_regular_files) files; \(.inventory.input_descendant_dirs) descendant directories; root README \(.inventory.root_readme_policy)", "- artifacts: \(.artifacts.total)", "- repository writes: \(.repository.writes)"' "$RUNNER_TEMP/runtime.json"
           } >> "$GITHUB_STEP_SUMMARY"
 
