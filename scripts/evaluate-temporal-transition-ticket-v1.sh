@@ -92,7 +92,7 @@ if jq -e '
        .proposal.expected_tree_digest,.ticket.predeclare.expected_tree_digest,
        .ticket.predeclare.predecessor_artifact_digest,
        .ticket.predeclare.predecessor_report_digest,
-       .ticket.predeclare.proposal_digest];
+       .ticket.predeclare.proposal_digest][];
       type=="string" and test("^sha256:[0-9a-f]{64}$"))
 ' "$evidence" >/dev/null 2>&1; then
   evidence_valid=true
@@ -477,7 +477,7 @@ for file in "${tracked[@]}"; do
 done
 jq -S -n \
   --arg subject_sha "$subject_sha" --arg scenario "$scenario" --arg source_digest "$activity_resolution_digest" \
-  --argjson files "$manifest_entries" \
+  --argjson manifest_files "$manifest_entries" \
   '{schema:"gooo/evidence-generator/temporal-transition-ticket/manifest/v1",subject_sha:$subject_sha,scenario:$scenario,
-    tracked_file_count:6,source_activity_resolution_digest:$source_digest,files:$files}' \
+    tracked_file_count:6,source_activity_resolution_digest:$source_digest,files:$manifest_files}' \
   > "$output_real/manifest.json"
