@@ -351,6 +351,7 @@ jobs:
 
           jq -S -n \
             --arg subject_sha "$SUBJECT_SHA" --arg resolution_digest "$resolution_digest" \
+            --arg before "$before" --arg after "$after" \
             --argjson build_wall_ms "$build_wall_ms" --argjson test_wall_ms "$test_wall_ms" \
             --argjson build_rss "$build_rss" --argjson test_rss "$test_rss" \
             --argjson repository_writes "$repository_writes" --argjson artifact_file_count "$artifact_file_count" \
