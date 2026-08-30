@@ -203,6 +203,7 @@ jobs:
                graph_hash:$graph_hash,semantic_digest:$entry.receipt.subject.semantic_digest,
                activity_resolution_digest:$resolution_digest}]
           ')
+          printf '%s\n' "$activity_refs" > "$RUNNER_TEMP/activity-refs.json"
 
           jq -S -n \
             --arg subject_sha "$SUBJECT_SHA" --arg graph_hash "$graph_hash" \
@@ -215,10 +216,10 @@ jobs:
             --arg build_result_digest "$evidence_build_result_digest" \
             --arg test_result_digest "$verification_test_result_digest" \
             --arg reuse_receipt_digest "$reuse_receipt_digest" \
-            --argjson build_wall_ms "$evidence_build_wall_ms" --argjson build_rss "$evidence_build_rss" \
-            --argjson test_wall_ms "$verification_test_wall_ms" --argjson test_rss "$verification_test_rss" \
+            --arg build_wall_ms "$evidence_build_wall_ms" --arg build_rss "$evidence_build_rss" \
+            --arg test_wall_ms "$verification_test_wall_ms" --arg test_rss "$verification_test_rss" \
             --slurpfile runner "$RUNNER_TEMP/runner.json" --slurpfile toolchain "$RUNNER_TEMP/toolchain.json" \
-            --argjson activity_refs "$activity_refs" \
+            --slurpfile activity_refs "$RUNNER_TEMP/activity-refs.json" \
             '{schema:"gooo/evidence-generator/execution-observation/v1",subject_sha:$subject_sha,
               authority:{graph_role:"meta_graph",graph_hash:$graph_hash,source_file:"examples/execution-observation/main.gooo",
                 source_digest:$source_digest,semantic_digest:$semantic_digest,activity_resolution_digest:$resolution_digest,
@@ -231,15 +232,15 @@ jobs:
                   reason:"NO_PRODUCT_BUILD_TARGET_IN_EVIDENCE_GENERATOR_REPOSITORY"},
                 product_test:{status:"NOT_APPLICABLE",wall_ms:null,activity_id:"TEST_STAGE",activity:"ObserveTestStage",
                   reason:"NO_PRODUCT_TEST_TARGET_IN_EVIDENCE_GENERATOR_REPOSITORY"}},
-              activity_refs:$activity_refs,
+              activity_refs:$activity_refs[0],
               stages:[
                 {id:"EVIDENCE_BUILD",kind:"BUILD",activity_id:"BUILD_STAGE",activity:"ObserveBuildStage",status:"EXECUTED",
-                 wall_ms:$build_wall_ms,peak_rss_kib:$build_rss,peak_rss_kib_available:true,
+                 wall_ms:($build_wall_ms|tonumber),peak_rss_kib:($build_rss|tonumber),peak_rss_kib_available:true,
                  runner_digest:$runner_digest,toolchain_digest:$toolchain_digest,input_digest:$scope_digest,
                  activity_resolution_digest:$resolution_digest,result_digest:$build_result_digest,
                  command:["bash","scripts/generate.sh"],cache:{state:"NOT_APPLICABLE",key:null,digest:null,authority:"NONE"}},
                 {id:"SEMANTIC_TEST",kind:"TEST",activity_id:"TEST_STAGE",activity:"ObserveTestStage",status:"EXECUTED",
-                 wall_ms:$test_wall_ms,peak_rss_kib:$test_rss,peak_rss_kib_available:true,
+                 wall_ms:($test_wall_ms|tonumber),peak_rss_kib:($test_rss|tonumber),peak_rss_kib_available:true,
                  runner_digest:$runner_digest,toolchain_digest:$toolchain_digest,input_digest:$scope_digest,
                  activity_resolution_digest:$resolution_digest,result_digest:$test_result_digest,
                  command:["bash","scripts/verify.sh"],cache:{state:"NOT_APPLICABLE",key:null,digest:null,authority:"NONE"}},
@@ -255,7 +256,7 @@ jobs:
                    runner_digest:$runner_digest,toolchain_digest:$toolchain_digest,consumer_executions:0}}
               ],
               comparison:{exact_before_after_pair_present:false,
-                build_wall_ms:{before:$build_wall_ms,after:null},test_wall_ms:{before:$test_wall_ms,after:null}},
+                build_wall_ms:{before:($build_wall_ms|tonumber),after:null},test_wall_ms:{before:($test_wall_ms|tonumber),after:null}},
               authority_contract:{measurement_source:"DIRECT_COMMAND_RECEIPT",log_parsing_authority:false,
                 source_repository_writes:0,local_test_executions:0,denominator_changes:0}}
           ' > "$RUNNER_TEMP/execution-observation.json"
