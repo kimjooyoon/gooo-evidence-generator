@@ -125,18 +125,18 @@ jobs:
             local input=$2
             local output=$3
             local report=$4
-            bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$input" "$resolution" "$outputs/$output" "$SUBJECT_SHA" "$name"
+            bash -x "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$input" "$resolution" "$outputs/$output" "$SUBJECT_SHA" "$name"
             bash "$conformer" "$outputs/$output" "$denominator" "$ticket" "$input" "$resolution" "$name" "$outputs/$report"
           }
 
           start_ns=$(date +%s%N)
           /usr/bin/time -f '%M' -o "$RUNNER_TEMP/evaluator-rss" \
-            bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$evidence" "$resolution" \
+            bash -x "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$evidence" "$resolution" \
               "$outputs/normal-a" "$SUBJECT_SHA" normal
           end_ns=$(date +%s%N)
           echo $(( (end_ns-start_ns+999999)/1000000 )) > "$RUNNER_TEMP/evaluator-wall-ms"
           bash "$conformer" "$outputs/normal-a" "$denominator" "$ticket" "$evidence" "$resolution" normal "$outputs/conform-normal-a.json"
-          bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$evidence" "$resolution" \
+          bash -x "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$evidence" "$resolution" \
             "$outputs/normal-b" "$SUBJECT_SHA" normal
           bash "$conformer" "$outputs/normal-b" "$denominator" "$ticket" "$evidence" "$resolution" normal "$outputs/conform-normal-b.json"
           diff -qr "$outputs/normal-a" "$outputs/normal-b"
