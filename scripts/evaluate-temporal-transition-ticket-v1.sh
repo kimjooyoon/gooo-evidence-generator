@@ -475,17 +475,9 @@ for file in "${tracked[@]}"; do
   digest=$(sha256sum "$output_real/$file" | awk '{print $1}')
   manifest_entries=$(jq -c --arg path "$file" --arg digest "$digest" '. + [{path:$path,sha256:$digest}]' <<<"$manifest_entries")
 done
-manifest_error="$temporary/manifest-jq-error"
-if jq -S -n \
+jq -S -n \
   --arg subject_sha "$subject_sha" --arg scenario "$scenario" --arg source_digest "$activity_resolution_digest" \
   --argjson manifest_files "$manifest_entries" \
   '{schema:"gooo/evidence-generator/temporal-transition-ticket/manifest/v1",subject_sha:$subject_sha,scenario:$scenario,
     tracked_file_count:6,source_activity_resolution_digest:$source_digest,files:$manifest_files}' \
-  > "$output_real/manifest.json" 2> "$manifest_error"; then
-  :
-else
-  manifest_status=$?
-  echo "manifest jq failed with status $manifest_status" >&2
-  cat "$manifest_error" >&2
-  exit "$manifest_status"
-fi
+  > "$output_real/manifest.json"
