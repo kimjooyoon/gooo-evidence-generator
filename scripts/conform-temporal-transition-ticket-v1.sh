@@ -65,7 +65,8 @@ jq -e \
   (if .summary.refuted>0 then .claim.state=="REFUTED" and .decision=="FAIL_CLOSED"
    elif .summary.unknown>0 then .claim.state=="UNKNOWN" and .decision=="TRANSITION_TICKET_UNKNOWN"
    else .claim.state=="CLOSED" and .decision=="TRANSITION_TICKET_CLOSED" end) and
-  (.claim.blocked_by|type)=="array" and (.claim.frontier|length)>0
+  (.claim.blocked_by|type)=="array" and
+  (if .claim.state=="CLOSED" then (.claim.frontier|length)==0 else (.claim.frontier|length)>0 end)
 ' "$output/evaluation.json" >/dev/null
 
 jq -e '
