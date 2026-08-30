@@ -193,17 +193,6 @@ jobs:
             > "$RUNNER_TEMP/reuse-receipt.json"
           reuse_receipt_digest=$(sha256sum "$RUNNER_TEMP/reuse-receipt.json" | awk '{print $1}')
 
-          jq -c -S \
-            --arg resolution_digest "$resolution_digest" --arg graph_hash "$graph_hash" \
-            --slurpfile denominator contracts/execution-observation-denominator-v1.json \
-            --slurpfile resolution "$resolution" '
-            [$denominator[0].cells[] as $cell |
-              ($resolution[0].activity_resolution_observation.entries[]|select(.id==$cell.id and .activity==$cell.activity)) as $entry |
-              {cell_id:$cell.id,activity_id:$cell.id,activity:$cell.activity,graph_role:"meta_graph",
-               graph_hash:$graph_hash,semantic_digest:$entry.receipt.subject.semantic_digest,
-               activity_resolution_digest:$resolution_digest}]
-          ' > "$RUNNER_TEMP/activity-refs.json"
-
           jq -S -n \
             --arg subject_sha "$SUBJECT_SHA" --arg graph_hash "$graph_hash" \
             --arg source_digest "$source_digest" --arg semantic_digest "$semantic_digest" \
@@ -218,7 +207,8 @@ jobs:
             --arg build_wall_ms "$evidence_build_wall_ms" --arg build_rss "$evidence_build_rss" \
             --arg test_wall_ms "$verification_test_wall_ms" --arg test_rss "$verification_test_rss" \
             --slurpfile runner "$RUNNER_TEMP/runner.json" --slurpfile toolchain "$RUNNER_TEMP/toolchain.json" \
-            --slurpfile activity_refs "$RUNNER_TEMP/activity-refs.json" \
+            --slurpfile denominator contracts/execution-observation-denominator-v1.json \
+            --slurpfile resolution "$resolution" \
             '{schema:"gooo/evidence-generator/execution-observation/v1",subject_sha:$subject_sha,
               authority:{graph_role:"meta_graph",graph_hash:$graph_hash,source_file:"examples/execution-observation/main.gooo",
                 source_digest:$source_digest,semantic_digest:$semantic_digest,activity_resolution_digest:$resolution_digest,
@@ -231,7 +221,11 @@ jobs:
                   reason:"NO_PRODUCT_BUILD_TARGET_IN_EVIDENCE_GENERATOR_REPOSITORY"},
                 product_test:{status:"NOT_APPLICABLE",wall_ms:null,activity_id:"TEST_STAGE",activity:"ObserveTestStage",
                   reason:"NO_PRODUCT_TEST_TARGET_IN_EVIDENCE_GENERATOR_REPOSITORY"}},
-              activity_refs:$activity_refs[0],
+              activity_refs:[$denominator[0].cells[] as $cell |
+                ($resolution[0].activity_resolution_observation.entries[]|select(.id==$cell.id and .activity==$cell.activity)) as $entry |
+                {cell_id:$cell.id,activity_id:$cell.id,activity:$cell.activity,graph_role:"meta_graph",
+                 graph_hash:$graph_hash,semantic_digest:$entry.receipt.subject.semantic_digest,
+                 activity_resolution_digest:$resolution_digest}],
               stages:[
                 {id:"EVIDENCE_BUILD",kind:"BUILD",activity_id:"BUILD_STAGE",activity:"ObserveBuildStage",status:"EXECUTED",
                  wall_ms:($build_wall_ms|tonumber),peak_rss_kib:($build_rss|tonumber),peak_rss_kib_available:true,
