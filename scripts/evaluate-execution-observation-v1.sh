@@ -246,7 +246,8 @@ jq -S -n \
   ([$cells[]|select(.unknown_class=="DIRECT_MISSING")]|length) as $direct_missing |
   ([$cells[]|select(.unknown_class=="DEPENDENCY_BLOCKED")]|length) as $dependency_blocked |
   ([$cells[]|select(.state!="CLOSED")][0] // null) as $first_nonclosed |
-  ([$cells[]|select(.state=="REFUTED")][0] // null) as $first_refuted |
+  ([$cells[]|select(.state=="REFUTED" and .reason!="DEPENDENCY_REFUTED")][0] //
+   [$cells[]|select(.state=="REFUTED")][0] // null) as $first_refuted |
   {
     schema:"gooo/evidence-generator/execution-observation-report/v1",
     decision:(if $refuted>0 then "FAIL_CLOSED" elif $unknown>0 then "INCOMPLETE" else "EXECUTION_OBSERVED" end),
