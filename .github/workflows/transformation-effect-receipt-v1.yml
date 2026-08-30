@@ -1,0 +1,258 @@
+name: Transformation effect receipt v1
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  transformation-effect:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.0'
+          cache: false
+
+      - name: Bind exact subject and source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "SUBJECT_SHA=${{ github.event.pull_request.head.sha || github.sha }}" >> "$GITHUB_ENV"
+          snapshot() {
+            find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -print0 |
+              sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+          }
+          snapshot > "$RUNNER_TEMP/repository-before"
+
+      - name: Acquire pinned released Gooo
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock=contracts/core-release-lock-v1.json
+          tag=$(jq -r '.tag' "$lock")
+          expected_tag_object=$(jq -r '.tag_object_sha' "$lock")
+          expected_target=$(jq -r '.target_commit_sha' "$lock")
+          asset_name=$(jq -r '.assets[0].name' "$lock")
+          expected_digest=$(jq -r '.assets[0].sha256' "$lock")
+
+          gh api "repos/kimjooyoon/meta-ontology-go/git/ref/tags/$tag" > "$RUNNER_TEMP/tag-ref.json"
+          jq -e --arg sha "$expected_tag_object" '.object.type=="tag" and .object.sha==$sha' "$RUNNER_TEMP/tag-ref.json" >/dev/null
+          gh api "repos/kimjooyoon/meta-ontology-go/git/tags/$expected_tag_object" > "$RUNNER_TEMP/tag-object.json"
+          jq -e --arg sha "$expected_target" '.object.type=="commit" and .object.sha==$sha' "$RUNNER_TEMP/tag-object.json" >/dev/null
+          gh api "repos/kimjooyoon/meta-ontology-go/releases/tags/$tag" > "$RUNNER_TEMP/release.json"
+          asset_id=$(jq -r --arg name "$asset_name" '.assets[]|select(.name==$name)|.id' "$RUNNER_TEMP/release.json")
+          test -n "$asset_id"
+          archive="$RUNNER_TEMP/$asset_name"
+          gh api -H 'Accept: application/octet-stream' "repos/kimjooyoon/meta-ontology-go/releases/assets/$asset_id" > "$archive"
+          printf '%s  %s\n' "$expected_digest" "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          chmod +x "$RUNNER_TEMP/gooo"
+          echo "GOOO_BIN=$RUNNER_TEMP/gooo" >> "$GITHUB_ENV"
+
+      - name: Bind twelve released meta activities
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file=examples/transformation-effect/main.gooo
+          "$GOOO_BIN" version --json > "$RUNNER_TEMP/version.json"
+          "$GOOO_BIN" check --json "$source_file" > "$RUNNER_TEMP/syntax.json"
+          "$GOOO_BIN" check --semantic --json "$source_file" > "$RUNNER_TEMP/semantic.json"
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/graph-rss" \
+            "$GOOO_BIN" graph dump "$source_file" > "$RUNNER_TEMP/graph.json"
+          jq -e '.schema_version=="gooo-version/v1" and .language=="gooo"' "$RUNNER_TEMP/version.json" >/dev/null
+          jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok"' "$RUNNER_TEMP/syntax.json" >/dev/null
+          jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok" and .semantic_hash!=null' "$RUNNER_TEMP/semantic.json" >/dev/null
+          jq -e '.schema_version=="gooo-graph/v1"' "$RUNNER_TEMP/graph.json" >/dev/null
+
+          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"project_graph",
+            selectors:[.cells[]|{ordinal,id,activity,selector:{name:.activity}}]}' \
+            contracts/transformation-effect-denominator-v1.json > "$RUNNER_TEMP/transformation-selectors.json"
+          bash scripts/bind-activity-resolutions.sh \
+            "$GOOO_BIN" "$source_file" "$RUNNER_TEMP/graph.json" \
+            "$RUNNER_TEMP/transformation-selectors.json" contracts/core-release-lock-v1.json \
+            "$RUNNER_TEMP/resolved-activities.json" project_graph
+          jq -e '.activity_resolution_observation.summary=={expected:12,observed:12,closed:12,unknown:0,refuted:0,unique_selectors:12}' "$RUNNER_TEMP/resolved-activities.json" >/dev/null
+
+      - name: Evaluate normal unknown and refuted cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          process_denominator=contracts/transformation-effect-denominator-v1.json
+          target_denominator=contracts/evidence-generator-denominator-v1.json
+          observation=contracts/repetition-observation-v1.json
+          candidate=contracts/transformation-candidate-v1.json
+          baseline=fixtures/transformation-effect/baseline.json
+          resolution="$RUNNER_TEMP/resolved-activities.json"
+          evaluator=scripts/evaluate-transformation-effect-v1.sh
+          conformer=scripts/conform-transformation-effect-v1.sh
+
+          start_ns=$(date +%s%N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/evaluator-rss" \
+            bash "$evaluator" "$GITHUB_WORKSPACE" "$process_denominator" "$target_denominator" \
+              "$observation" "$candidate" "$baseline" "$resolution" \
+              "$RUNNER_TEMP/normal-a" "$SUBJECT_SHA" normal
+          end_ns=$(date +%s%N)
+          echo $(( (end_ns-start_ns+999999)/1000000 )) > "$RUNNER_TEMP/evaluator-wall-ms"
+
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$process_denominator" "$target_denominator" \
+            "$observation" "$candidate" "$baseline" "$resolution" \
+            "$RUNNER_TEMP/normal-b" "$SUBJECT_SHA" normal
+          diff -qr "$RUNNER_TEMP/normal-a" "$RUNNER_TEMP/normal-b"
+
+          mkdir -p "$RUNNER_TEMP/scenarios"
+          jq 'del(.patterns[]|select(.id=="explicit-unknown"))' "$observation" > "$RUNNER_TEMP/scenarios/missing-observation.json"
+          jq '(.operation.kind)="REWRITE_DENOMINATOR"' "$candidate" > "$RUNNER_TEMP/scenarios/unauthorized-candidate.json"
+          jq '
+            (.cells[]|select(.id=="UNKNOWN_TRACE")) |= (
+              .state="REFUTED" | .stage="EVALUATION" | .step="OBSERVE_BASELINE_COUNTEREXAMPLE" |
+              .reason="OBSERVED_SEMANTIC_COUNTEREXAMPLE" | .unknown_class=null |
+              .next_operation="REJECT_CANDIDATE" | .blocked_by=[]
+            )
+          ' "$baseline" > "$RUNNER_TEMP/scenarios/refuted-baseline.json"
+
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$process_denominator" "$target_denominator" \
+            "$RUNNER_TEMP/scenarios/missing-observation.json" "$candidate" "$baseline" "$resolution" \
+            "$RUNNER_TEMP/missing-pattern" "$SUBJECT_SHA" missing-pattern
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$process_denominator" "$target_denominator" \
+            "$observation" "$RUNNER_TEMP/scenarios/unauthorized-candidate.json" "$baseline" "$resolution" \
+            "$RUNNER_TEMP/unauthorized-operation" "$SUBJECT_SHA" unauthorized-operation
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$process_denominator" "$target_denominator" \
+            "$RUNNER_TEMP/scenarios/missing-observation.json" "$candidate" "$RUNNER_TEMP/scenarios/refuted-baseline.json" "$resolution" \
+            "$RUNNER_TEMP/refuted-over-unknown" "$SUBJECT_SHA" refuted-over-unknown
+
+          bash "$conformer" "$RUNNER_TEMP/normal-a" "$process_denominator" "$target_denominator" "$observation" "$candidate" "$baseline" normal "$RUNNER_TEMP/conform-normal-a.json"
+          bash "$conformer" "$RUNNER_TEMP/normal-b" "$process_denominator" "$target_denominator" "$observation" "$candidate" "$baseline" normal "$RUNNER_TEMP/conform-normal-b.json"
+          bash "$conformer" "$RUNNER_TEMP/missing-pattern" "$process_denominator" "$target_denominator" "$RUNNER_TEMP/scenarios/missing-observation.json" "$candidate" "$baseline" missing-pattern "$RUNNER_TEMP/conform-missing-pattern.json"
+          bash "$conformer" "$RUNNER_TEMP/unauthorized-operation" "$process_denominator" "$target_denominator" "$observation" "$RUNNER_TEMP/scenarios/unauthorized-candidate.json" "$baseline" unauthorized-operation "$RUNNER_TEMP/conform-unauthorized-operation.json"
+          bash "$conformer" "$RUNNER_TEMP/refuted-over-unknown" "$process_denominator" "$target_denominator" "$RUNNER_TEMP/scenarios/missing-observation.json" "$candidate" "$RUNNER_TEMP/scenarios/refuted-baseline.json" refuted-over-unknown "$RUNNER_TEMP/conform-refuted-over-unknown.json"
+
+      - name: Record exact runtime inventory and authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot() {
+            find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -print0 |
+              sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+          }
+          before=$(cat "$RUNNER_TEMP/repository-before")
+          after=$(snapshot)
+          if [ "$before" = "$after" ]; then repository_writes=0; else repository_writes=1; fi
+
+          descendant_dirs=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -mindepth 1 -type d -print | wc -l | tr -d ' ')
+          regular_files=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f ! -path "$GITHUB_WORKSPACE/README.md" -print | wc -l | tr -d ' ')
+          physical_lines=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f ! -path "$GITHUB_WORKSPACE/README.md" -print0 | sort -z | xargs -0 cat | wc -l | tr -d ' ')
+          go_files=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -name '*.go' -print | wc -l | tr -d ' ')
+          gooo_files=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -name '*.gooo' -print | wc -l | tr -d ' ')
+          go_lines=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -name '*.go' -print0 | xargs -0 -r cat | wc -l | tr -d ' ')
+          gooo_lines=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -name '*.gooo' -print0 | xargs -0 -r cat | wc -l | tr -d ' ')
+
+          language_files='[]'
+          while IFS= read -r -d '' file; do
+            relative=${file#"$GITHUB_WORKSPACE/"}
+            lines=$(wc -l < "$file" | tr -d ' ')
+            case "$file" in *.gooo) language=Gooo ;; *.go) language=Go ;; esac
+            language_files=$(jq -c --arg path "$relative" --arg language "$language" --argjson lines "$lines" '. + [{path:$path,language:$language,physical_lines:$lines}]' <<<"$language_files")
+          done < <(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f \( -name '*.go' -o -name '*.gooo' \) -print0 | sort -z)
+
+          wall_ms=$(cat "$RUNNER_TEMP/evaluator-wall-ms")
+          peak_rss_kib=$(cat "$RUNNER_TEMP/evaluator-rss")
+          graph_peak_rss_kib=$(cat "$RUNNER_TEMP/graph-rss")
+          go_version=$(go env GOVERSION)
+          jq -S -n \
+            --arg subject_sha "$SUBJECT_SHA" \
+            --arg before "$before" \
+            --arg after "$after" \
+            --arg go_version "$go_version" \
+            --argjson repository_writes "$repository_writes" \
+            --argjson descendant_dirs "$descendant_dirs" \
+            --argjson regular_files "$regular_files" \
+            --argjson physical_lines "$physical_lines" \
+            --argjson go_files "$go_files" \
+            --argjson gooo_files "$gooo_files" \
+            --argjson go_lines "$go_lines" \
+            --argjson gooo_lines "$gooo_lines" \
+            --argjson language_files "$language_files" \
+            --argjson wall_ms "$wall_ms" \
+            --argjson peak_rss_kib "$peak_rss_kib" \
+            --argjson graph_peak_rss_kib "$graph_peak_rss_kib" \
+            --slurpfile receipt "$RUNNER_TEMP/normal-a/effect-receipt.json" '
+            {
+              schema:"gooo/evidence-generator/transformation-runtime/v1",
+              subject_sha:$subject_sha,
+              toolchain:{go:$go_version,go_required:"go1.27.0",released_gooo_reuse:1,
+                released_test_receipt_reuse:{state:"UNKNOWN",observed:0,required:1}},
+              executions:{
+                gooo_version:1,gooo_syntax_check:1,gooo_semantic_check:1,gooo_graph:1,
+                effect_evaluator:5,successful_candidate_runs:2,isolated_transform_calculations:4,
+                conformer:5,go_build:0,go_test:0,product_build:0,product_test:0,local_test:0,
+                acquisition_network_requests:4,transformation_network_requests:0
+              },
+              runtime:{normal_evaluator_wall_ms:$wall_ms,normal_evaluator_peak_rss_kib:$peak_rss_kib,
+                gooo_graph_peak_rss_kib:$graph_peak_rss_kib},
+              inventory:{root_readme_policy:"EXCLUDED",input_descendant_dirs:$descendant_dirs,
+                input_regular_files:$regular_files,input_physical_lines:$physical_lines,
+                input_go_files:$go_files,input_go_physical_lines:$go_lines,
+                input_gooo_files:$gooo_files,input_gooo_physical_lines:$gooo_lines,
+                language_files:$language_files},
+              repository:{before_digest:$before,after_digest:$after,writes:$repository_writes},
+              exact_effect:$receipt[0].effect,
+              improvement_claim:{fixture_pairs:{observed:1,required:1},generalized_language:{observed:0,required:1,state:"UNKNOWN"},
+                saved_build_ms:{state:"UNKNOWN",before:null,after:null},saved_test_ms:{state:"UNKNOWN",before:null,after:null}},
+              cases:{normal:1,unknown:1,refuted:2,normal_replay_runs:2},
+              artifacts:{evaluator_outputs:45,conformer_reports:5,runtime_receipts:1,released_meta_receipts:5,total:56}
+            }
+          ' > "$RUNNER_TEMP/runtime.json"
+          jq -e '.toolchain.go=="go1.27.0" and .repository.writes==0 and .executions.go_build==0 and .executions.go_test==0 and .executions.local_test==0 and .artifacts.total==56' "$RUNNER_TEMP/runtime.json" >/dev/null
+
+          artifact_files=$(
+            find "$RUNNER_TEMP/normal-a" "$RUNNER_TEMP/normal-b" "$RUNNER_TEMP/missing-pattern" "$RUNNER_TEMP/unauthorized-operation" "$RUNNER_TEMP/refuted-over-unknown" -type f
+            printf '%s\n' "$RUNNER_TEMP/conform-normal-a.json" "$RUNNER_TEMP/conform-normal-b.json" "$RUNNER_TEMP/conform-missing-pattern.json" "$RUNNER_TEMP/conform-unauthorized-operation.json" "$RUNNER_TEMP/conform-refuted-over-unknown.json" "$RUNNER_TEMP/runtime.json" "$RUNNER_TEMP/version.json" "$RUNNER_TEMP/syntax.json" "$RUNNER_TEMP/semantic.json" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/resolved-activities.json"
+          )
+          test "$(printf '%s\n' "$artifact_files" | sed '/^$/d' | wc -l | tr -d ' ')" -eq 56
+
+          {
+            echo '## Transformation effect receipt v1'
+            jq -r '"- process: \(.process.summary.closed)/\(.process.summary.total) CLOSED; UNKNOWN \(.process.summary.unknown); REFUTED \(.process.summary.refuted)",
+              "- fixture: \(.effect.before.closed)/\(.effect.before.total) -> \(.effect.after.closed)/\(.effect.after.total) CLOSED",
+              "- exact delta: CLOSED \(.effect.delta.closed); UNKNOWN \(.effect.delta.unknown); REFUTED \(.effect.delta.refuted); denominator \(.effect.delta.total)",
+              "- unrelated cell changes: \(.effect.unrelated_cell_changes)",
+              "- external utility: \(.external_utility.evidence)/\(.external_utility.required) \(.external_utility.state)"' "$RUNNER_TEMP/normal-a/effect-receipt.json"
+            jq -r '"- cases: normal \(.cases.normal); UNKNOWN \(.cases.unknown); REFUTED \(.cases.refuted)",
+              "- evaluator: \(.runtime.normal_evaluator_wall_ms) ms; \(.runtime.normal_evaluator_peak_rss_kib) KiB peak RSS",
+              "- inventory: Go \(.inventory.input_go_files) files / \(.inventory.input_go_physical_lines) lines; Gooo \(.inventory.input_gooo_files) files / \(.inventory.input_gooo_physical_lines) lines",
+              "- tree: \(.inventory.input_regular_files) regular files; \(.inventory.input_descendant_dirs) descendant directories; root README \(.inventory.root_readme_policy)",
+              "- builds/tests/repository writes: \(.executions.go_build)/\(.executions.go_test)/\(.repository.writes)",
+              "- artifact files: \(.artifacts.total)"' "$RUNNER_TEMP/runtime.json"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload exact transformation evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: transformation-effect-v1-${{ github.event.pull_request.head.sha || github.sha }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/normal-a
+            ${{ runner.temp }}/normal-b
+            ${{ runner.temp }}/missing-pattern
+            ${{ runner.temp }}/unauthorized-operation
+            ${{ runner.temp }}/refuted-over-unknown
+            ${{ runner.temp }}/conform-normal-a.json
+            ${{ runner.temp }}/conform-normal-b.json
+            ${{ runner.temp }}/conform-missing-pattern.json
+            ${{ runner.temp }}/conform-unauthorized-operation.json
+            ${{ runner.temp }}/conform-refuted-over-unknown.json
+            ${{ runner.temp }}/runtime.json
+            ${{ runner.temp }}/version.json
+            ${{ runner.temp }}/syntax.json
+            ${{ runner.temp }}/semantic.json
+            ${{ runner.temp }}/graph.json
+            ${{ runner.temp }}/resolved-activities.json
