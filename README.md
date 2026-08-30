@@ -137,3 +137,25 @@ The normal fixture records one producer test execution, one receipt reuse, and
 zero consumer test executions. Saved test time remains UNKNOWN because this
 experiment does not have an independent equivalent timing pair. See
 [the test receipt reuse RFC](docs/rfcs/test-receipt-reuse-v1.md).
+
+## Counterexample-guided revision v1
+
+The counterexample-guided revision loop emits a minimal, caller-owned proposal
+that lowers one claim's resolution. It preserves the input claim as `UNKNOWN`;
+even a valid proposal never promotes that claim to `CLOSED`. Exact before/after
+evidence is required for an improvement claim, so improvement remains
+`UNKNOWN` in this fixture.
+
+The evaluator records the exact causal `stage`, `step`, `reason`, unknown class,
+next operation, blocked-by set, and frontier for direct missing, stale,
+ambiguous, unbounded, and dependency-blocked evidence. Known counterexamples,
+malformed evidence, an unrecognized upper decision, and `FIXED_POINT` fail
+closed as `REFUTED`, which takes precedence over UNKNOWN in mixed cases.
+
+Its fixed denominator is 12 cells and 12 one-to-one released Gooo activities:
+`FOUNDATION 4 / COHERENCE 4 / REGRESSION 4` and
+`DRIVER 4 / OUTCOME 4 / GUARDRAIL 4`. CI covers normal, direct-missing,
+dependency-blocked, stale, ambiguous, unbounded, counterexample, malformed,
+`FIXED_POINT`, unrecognized-decision, and mixed cases. It writes no source
+repository files and runs no local tests. See
+[the counterexample-guided revision RFC](docs/rfcs/counterexample-guided-revision-v1.md).

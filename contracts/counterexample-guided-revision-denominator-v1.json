@@ -1,0 +1,29 @@
+{
+  "schema": "gooo/evidence-generator/counterexample-guided-revision-denominator/v1",
+  "id": "gooo://denominator/counterexample-guided-revision/v1",
+  "target_cells": 12,
+  "proof_totals": [
+    {"proof_choice": "FOUNDATION", "total": 4},
+    {"proof_choice": "COHERENCE", "total": 4},
+    {"proof_choice": "REGRESSION", "total": 4}
+  ],
+  "indicator_totals": [
+    {"indicator_class": "DRIVER", "total": 4},
+    {"indicator_class": "OUTCOME", "total": 4},
+    {"indicator_class": "GUARDRAIL", "total": 4}
+  ],
+  "cells": [
+    {"ordinal": 1, "id": "RELEASED_GOOO_IDENTITY", "activity": "ObserveReleasedRevisionCore", "stage": "CORE_RELEASE", "step": "OBSERVE_RELEASED_REVISION_CORE", "proof_choice": "FOUNDATION", "indicator_class": "DRIVER", "closed_reason": "RELEASED_REVISION_CORE_OBSERVED", "depends_on": []},
+    {"ordinal": 2, "id": "META_ACTIVITY_AUTHORITY", "activity": "BindRevisionActivities", "stage": "META_AUTHORITY", "step": "BIND_REVISION_ACTIVITIES", "proof_choice": "FOUNDATION", "indicator_class": "GUARDRAIL", "closed_reason": "REVISION_ACTIVITIES_BOUND", "depends_on": ["RELEASED_GOOO_IDENTITY"]},
+    {"ordinal": 3, "id": "CLAIM_INPUT", "activity": "ObserveInputClaim", "stage": "CLAIM", "step": "OBSERVE_INPUT_CLAIM", "proof_choice": "FOUNDATION", "indicator_class": "DRIVER", "closed_reason": "INPUT_CLAIM_PRESERVED", "depends_on": ["META_ACTIVITY_AUTHORITY"]},
+    {"ordinal": 4, "id": "REVISION_SCOPE", "activity": "BoundRevisionScope", "stage": "BOUNDARY", "step": "BOUND_REVISION_SCOPE", "proof_choice": "FOUNDATION", "indicator_class": "OUTCOME", "closed_reason": "REVISION_SCOPE_BOUNDED", "depends_on": ["CLAIM_INPUT"]},
+    {"ordinal": 5, "id": "CAUSAL_FRONTIER", "activity": "LocateCausalFrontier", "stage": "FRONTIER", "step": "LOCATE_CAUSAL_FRONTIER", "proof_choice": "COHERENCE", "indicator_class": "DRIVER", "closed_reason": "CAUSAL_FRONTIER_LOCATED", "depends_on": ["CLAIM_INPUT", "REVISION_SCOPE"]},
+    {"ordinal": 6, "id": "COUNTEREXAMPLE_RECEIPT", "activity": "ObserveRevisionCounterexample", "stage": "COUNTEREXAMPLE", "step": "OBSERVE_REVISION_COUNTEREXAMPLE", "proof_choice": "COHERENCE", "indicator_class": "OUTCOME", "closed_reason": "COUNTEREXAMPLE_ABSENCE_OBSERVED", "depends_on": ["META_ACTIVITY_AUTHORITY", "CLAIM_INPUT"]},
+    {"ordinal": 7, "id": "RESOLUTION_BOUNDARY", "activity": "SelectResolutionBoundary", "stage": "RESOLUTION", "step": "SELECT_RESOLUTION_BOUNDARY", "proof_choice": "COHERENCE", "indicator_class": "DRIVER", "closed_reason": "RESOLUTION_BOUNDARY_SELECTED", "depends_on": ["REVISION_SCOPE", "CAUSAL_FRONTIER", "COUNTEREXAMPLE_RECEIPT"]},
+    {"ordinal": 8, "id": "REVISION_PROPOSAL", "activity": "GenerateRevisionProposal", "stage": "PROPOSAL", "step": "GENERATE_REVISION_PROPOSAL", "proof_choice": "COHERENCE", "indicator_class": "OUTCOME", "closed_reason": "MINIMAL_REVISION_PROPOSAL_GENERATED", "depends_on": ["RESOLUTION_BOUNDARY"]},
+    {"ordinal": 9, "id": "REPLAY_GUARD", "activity": "VerifyRevisionReplay", "stage": "REPLAY", "step": "VERIFY_REVISION_REPLAY", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "REVISION_REPLAY_GUARDED", "depends_on": ["REVISION_PROPOSAL"]},
+    {"ordinal": 10, "id": "UNKNOWN_TRACE", "activity": "PreserveRevisionUnknown", "stage": "UNCERTAINTY", "step": "PRESERVE_REVISION_UNKNOWN", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "REVISION_UNKNOWN_PRESERVED", "depends_on": ["CLAIM_INPUT"]},
+    {"ordinal": 11, "id": "REFUTATION_PRECEDENCE", "activity": "PrioritizeRevisionRefutation", "stage": "REFUTATION", "step": "PRIORITIZE_REVISION_REFUTATION", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "REFUTATION_PRECEDENCE_PRESERVED", "depends_on": ["META_ACTIVITY_AUTHORITY", "COUNTEREXAMPLE_RECEIPT"]},
+    {"ordinal": 12, "id": "HUMAN_DOSSIER", "activity": "PublishRevisionHumanDossier", "stage": "REPORT", "step": "PUBLISH_REVISION_HUMAN_DOSSIER", "proof_choice": "REGRESSION", "indicator_class": "OUTCOME", "closed_reason": "REVISION_HUMAN_DOSSIER_PUBLISHED", "depends_on": ["RESOLUTION_BOUNDARY", "REVISION_PROPOSAL", "REPLAY_GUARD", "UNKNOWN_TRACE", "REFUTATION_PRECEDENCE"]}
+  ]
+}

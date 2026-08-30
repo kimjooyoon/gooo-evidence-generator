@@ -1,0 +1,21 @@
+{
+  "schema": "gooo/evidence-generator/counterexample-guided-revision/claim/v1",
+  "id": "gooo://claim/counterexample-guided-revision/unknown-resolution/v1",
+  "state": "UNKNOWN",
+  "resolution": "HIGH",
+  "stage": "CLAIM",
+  "step": "OBSERVE_INPUT_CLAIM",
+  "reason": "INPUT_CLAIM_REQUIRES_BOUNDED_REVISION",
+  "unknown_class": "UNBOUNDED",
+  "next_operation": "PROPOSE_RESOLUTION_ONLY_REVISION",
+  "blocked_by": [],
+  "subject_id": "gooo://project/counterexample-guided-revision/v1",
+  "scope": {"claims": 1, "changed_paths": ["resolution"]},
+  "improvement_claim": {
+    "state": "UNKNOWN",
+    "reason": "EXACT_BEFORE_AFTER_PAIR_ABSENT",
+    "unknown_class": "DIRECT_MISSING",
+    "next_operation": "PROVIDE_EXACT_BEFORE_AFTER_PAIR",
+    "blocked_by": []
+  }
+}

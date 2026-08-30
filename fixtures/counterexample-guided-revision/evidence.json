@@ -1,0 +1,14 @@
+{
+  "schema": "gooo/evidence-generator/counterexample-guided-revision/evidence/v1",
+  "claim_id": "gooo://claim/counterexample-guided-revision/unknown-resolution/v1",
+  "upper_decision": "CLOSED",
+  "observation": {
+    "claim_present": true,
+    "subject_present": true,
+    "frontier_bounded": true,
+    "scope_unambiguous": true,
+    "fresh": true,
+    "dependencies": [{"id": "UPSTREAM_DECISION", "state": "CLOSED"}]
+  },
+  "counterexample": {"present": false}
+}
