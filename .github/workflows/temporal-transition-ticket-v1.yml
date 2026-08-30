@@ -1,0 +1,260 @@
+name: Temporal transition ticket v1
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  temporal-transition-ticket:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.0'
+          cache: false
+
+      - name: Bind exact subject and source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "SUBJECT_SHA=${{ github.event.pull_request.head.sha || github.sha }}" >> "$GITHUB_ENV"
+          snapshot() {
+            find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -print0 |
+              sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+          }
+          snapshot > "$RUNNER_TEMP/repository-before"
+
+      - name: Acquire pinned released Gooo
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock=contracts/core-release-lock-v1.json
+          tag=$(jq -r '.tag' "$lock")
+          expected_tag_object=$(jq -r '.tag_object_sha' "$lock")
+          expected_target=$(jq -r '.target_commit_sha' "$lock")
+          asset_name=$(jq -r '.assets[0].name' "$lock")
+          expected_digest=$(jq -r '.assets[0].sha256' "$lock")
+
+          gh api "repos/kimjooyoon/meta-ontology-go/git/ref/tags/$tag" > "$RUNNER_TEMP/tag-ref.json"
+          jq -e --arg sha "$expected_tag_object" '.object.type=="tag" and .object.sha==$sha' "$RUNNER_TEMP/tag-ref.json" >/dev/null
+          gh api "repos/kimjooyoon/meta-ontology-go/git/tags/$expected_tag_object" > "$RUNNER_TEMP/tag-object.json"
+          jq -e --arg sha "$expected_target" '.object.type=="commit" and .object.sha==$sha' "$RUNNER_TEMP/tag-object.json" >/dev/null
+          gh api "repos/kimjooyoon/meta-ontology-go/releases/tags/$tag" > "$RUNNER_TEMP/release.json"
+          asset_id=$(jq -r --arg name "$asset_name" '.assets[]|select(.name==$name)|.id' "$RUNNER_TEMP/release.json")
+          test -n "$asset_id"
+          archive="$RUNNER_TEMP/$asset_name"
+          gh api -H 'Accept: application/octet-stream' "repos/kimjooyoon/meta-ontology-go/releases/assets/$asset_id" > "$archive"
+          printf '%s  %s\n' "$expected_digest" "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          chmod +x "$RUNNER_TEMP/gooo"
+          echo "GOOO_BIN=$RUNNER_TEMP/gooo" >> "$GITHUB_ENV"
+
+      - name: Generate released transition IR and bind twelve activities
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file=examples/temporal-transition-ticket/main.gooo
+          denominator=contracts/temporal-transition-ticket-denominator-v1.json
+          "$GOOO_BIN" version --json > "$RUNNER_TEMP/version.json"
+          "$GOOO_BIN" check --json "$source_file" > "$RUNNER_TEMP/syntax.json"
+          "$GOOO_BIN" check --semantic --json "$source_file" > "$RUNNER_TEMP/semantic.json"
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/graph-rss" \
+            "$GOOO_BIN" graph dump "$source_file" > "$RUNNER_TEMP/graph.json"
+          jq -e '.schema_version=="gooo-version/v1" and .language=="gooo"' "$RUNNER_TEMP/version.json" >/dev/null
+          jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok"' "$RUNNER_TEMP/syntax.json" >/dev/null
+          jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok" and .semantic_hash!=null' "$RUNNER_TEMP/semantic.json" >/dev/null
+          jq -e '.schema_version=="gooo-graph/v1" and .ir.status=="available"' "$RUNNER_TEMP/graph.json" >/dev/null
+
+          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"project_graph",
+            selectors:[.cells[]|{ordinal,id,activity,selector:{name:.activity}}]}' \
+            "$denominator" > "$RUNNER_TEMP/transition-selectors.json"
+          bash scripts/bind-activity-resolutions.sh \
+            "$GOOO_BIN" "$source_file" "$RUNNER_TEMP/graph.json" \
+            "$RUNNER_TEMP/transition-selectors.json" contracts/core-release-lock-v1.json \
+            "$RUNNER_TEMP/resolved-transition-graph.json" project_graph
+          jq -e '.activity_resolution_observation.summary=={expected:12,observed:12,closed:12,unknown:0,refuted:0,unique_selectors:12}' \
+            "$RUNNER_TEMP/resolved-transition-graph.json" >/dev/null
+
+      - name: Prepare exact transition ticket cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/temporal-scenarios" "$RUNNER_TEMP/temporal-evidence"
+          evidence=fixtures/temporal-transition-ticket/evidence.json
+          jq '.' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/normal.json"
+          jq '.consume.attempted=false' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/prepared-not-consumed.json"
+          jq '.predecessor.artifact_present=false' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/missing-predecessor-artifact.json"
+          jq '.ticket.fresh=false' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/expired-stale.json"
+          jq '.predecessor.identity_state="UNKNOWN"' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/dependency-blocked.json"
+          jq '.consume.successor.target_branch="release"' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/target-mismatch.json"
+          jq '.consume.successor.tree_digest="sha256:0000000000000000000000000000000000000000000000000000000000000000"' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/tree-mismatch.json"
+          jq '.consume.successor.policy_digest="sha256:0000000000000000000000000000000000000000000000000000000000000000"' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/policy-mismatch.json"
+          jq '.consume.successor.toolchain_digest="sha256:0000000000000000000000000000000000000000000000000000000000000000"' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/toolchain-mismatch.json"
+          jq '.consume.successor.workflow_digest="sha256:0000000000000000000000000000000000000000000000000000000000000000"' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/workflow-mismatch.json"
+          jq '.ticket.phase="ABSENT" | .ticket.prepared=false | .ticket.predeclared_before_successor=false' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/consume-before-prepare.json"
+          jq '.ticket.phase="CLOSED" | .consume.reuse=true' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/replay-reuse.json"
+          jq '.predecessor.observed_artifact_digest="sha256:0000000000000000000000000000000000000000000000000000000000000000"' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/digest-laundering.json"
+          jq '.upper_decision="MYSTERY"' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/unknown-top-level-decision.json"
+          jq '.ticket.post_hoc=true | .ticket.predeclared_before_successor=false' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/post-hoc-ticket.json"
+          jq '.ticket.retroactive_closure_requested=true' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/retroactive-closure.json"
+          jq '.authority.write_escalation=true' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/authority-write-escalation.json"
+          jq '.ticket.fresh=false | .consume.successor.target_branch="release"' "$evidence" > "$RUNNER_TEMP/temporal-scenarios/mixed.json"
+
+      - name: Evaluate PREDECLARE and CONSUME_ONCE cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          denominator=contracts/temporal-transition-ticket-denominator-v1.json
+          ticket=contracts/temporal-transition-ticket-v1.json
+          evidence=fixtures/temporal-transition-ticket/evidence.json
+          resolution="$RUNNER_TEMP/resolved-transition-graph.json"
+          evaluator=scripts/evaluate-temporal-transition-ticket-v1.sh
+          conformer=scripts/conform-temporal-transition-ticket-v1.sh
+          scenarios="$RUNNER_TEMP/temporal-scenarios"
+          outputs="$RUNNER_TEMP/temporal-evidence"
+          run_case() {
+            local name=$1
+            local input=$2
+            local output=$3
+            local report=$4
+            bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$input" "$resolution" "$outputs/$output" "$SUBJECT_SHA" "$name"
+            bash "$conformer" "$outputs/$output" "$denominator" "$ticket" "$input" "$resolution" "$name" "$outputs/$report"
+          }
+
+          start_ns=$(date +%s%N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/evaluator-rss" \
+            bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$evidence" "$resolution" \
+              "$outputs/normal-a" "$SUBJECT_SHA" normal
+          end_ns=$(date +%s%N)
+          echo $(( (end_ns-start_ns+999999)/1000000 )) > "$RUNNER_TEMP/evaluator-wall-ms"
+          bash "$conformer" "$outputs/normal-a" "$denominator" "$ticket" "$evidence" "$resolution" normal "$outputs/conform-normal-a.json"
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$evidence" "$resolution" \
+            "$outputs/normal-b" "$SUBJECT_SHA" normal
+          bash "$conformer" "$outputs/normal-b" "$denominator" "$ticket" "$evidence" "$resolution" normal "$outputs/conform-normal-b.json"
+          diff -qr "$outputs/normal-a" "$outputs/normal-b"
+
+          run_case prepared-not-consumed "$scenarios/prepared-not-consumed.json" prepared-not-consumed conform-prepared-not-consumed.json
+          run_case missing-predecessor-artifact "$scenarios/missing-predecessor-artifact.json" missing-predecessor-artifact conform-missing-predecessor-artifact.json
+          run_case expired-stale "$scenarios/expired-stale.json" expired-stale conform-expired-stale.json
+          run_case dependency-blocked "$scenarios/dependency-blocked.json" dependency-blocked conform-dependency-blocked.json
+          run_case target-mismatch "$scenarios/target-mismatch.json" target-mismatch conform-target-mismatch.json
+          run_case tree-mismatch "$scenarios/tree-mismatch.json" tree-mismatch conform-tree-mismatch.json
+          run_case policy-mismatch "$scenarios/policy-mismatch.json" policy-mismatch conform-policy-mismatch.json
+          run_case toolchain-mismatch "$scenarios/toolchain-mismatch.json" toolchain-mismatch conform-toolchain-mismatch.json
+          run_case workflow-mismatch "$scenarios/workflow-mismatch.json" workflow-mismatch conform-workflow-mismatch.json
+          run_case consume-before-prepare "$scenarios/consume-before-prepare.json" consume-before-prepare conform-consume-before-prepare.json
+          run_case replay-reuse "$scenarios/replay-reuse.json" replay-reuse conform-replay-reuse.json
+          run_case digest-laundering "$scenarios/digest-laundering.json" digest-laundering conform-digest-laundering.json
+          run_case unknown-top-level-decision "$scenarios/unknown-top-level-decision.json" unknown-top-level-decision conform-unknown-top-level-decision.json
+          run_case post-hoc-ticket "$scenarios/post-hoc-ticket.json" post-hoc-ticket conform-post-hoc-ticket.json
+          run_case retroactive-closure "$scenarios/retroactive-closure.json" retroactive-closure conform-retroactive-closure.json
+          run_case authority-write-escalation "$scenarios/authority-write-escalation.json" authority-write-escalation conform-authority-write-escalation.json
+          run_case mixed "$scenarios/mixed.json" mixed conform-mixed.json
+
+      - name: Record exact inventory authority and runtime evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot() {
+            find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -print0 |
+              sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+          }
+          before=$(cat "$RUNNER_TEMP/repository-before")
+          after=$(snapshot)
+          if [ "$before" = "$after" ]; then repository_writes=0; else repository_writes=1; fi
+
+          regular_files=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f ! -path "$GITHUB_WORKSPACE/README.md" -print | wc -l | tr -d ' ')
+          physical_lines=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f ! -path "$GITHUB_WORKSPACE/README.md" -print0 | sort -z | xargs -0 cat | wc -l | tr -d ' ')
+          descendant_dirs=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -mindepth 1 -type d -print | wc -l | tr -d ' ')
+          go_files=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -name '*.go' -print | wc -l | tr -d ' ')
+          gooo_files=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -name '*.gooo' -print | wc -l | tr -d ' ')
+          go_lines=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -name '*.go' -print0 | sort -z | xargs -0 -r cat | wc -l | tr -d ' ')
+          gooo_lines=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -name '*.gooo' -print0 | sort -z | xargs -0 -r cat | wc -l | tr -d ' ')
+          language_files=$(
+            find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f \( -name '*.go' -o -name '*.gooo' \) -print0 |
+              sort -z | while IFS= read -r -d '' file; do
+                relative=${file#"$GITHUB_WORKSPACE/"}
+                case "$file" in *.gooo) language=Gooo ;; *) language=Go ;; esac
+                jq -cn --arg language "$language" --arg path "$relative" --argjson physical_lines "$(wc -l < "$file" | tr -d ' ')" \
+                  '{language:$language,path:$path,physical_lines:$physical_lines}'
+              done | jq -s .
+          )
+
+          go_version=$(go env GOVERSION)
+          evaluator_wall_ms=$(cat "$RUNNER_TEMP/evaluator-wall-ms")
+          evaluator_peak_rss_kib=$(cat "$RUNNER_TEMP/evaluator-rss")
+          graph_peak_rss_kib=$(cat "$RUNNER_TEMP/graph-rss")
+          cp "$RUNNER_TEMP/version.json" "$RUNNER_TEMP/syntax.json" "$RUNNER_TEMP/semantic.json" \
+            "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/resolved-transition-graph.json" "$RUNNER_TEMP/temporal-evidence/"
+          scenario_output_files=$(find "$RUNNER_TEMP/temporal-evidence" -mindepth 2 -type f ! -name 'conform-*.json' -print | wc -l | tr -d ' ')
+          conformer_reports=$(find "$RUNNER_TEMP/temporal-evidence" -maxdepth 1 -name 'conform-*.json' -type f | wc -l | tr -d ' ')
+          artifact_files=$((scenario_output_files + conformer_reports + 6))
+
+          jq -S -n \
+            --arg subject_sha "$SUBJECT_SHA" --arg before "$before" --arg after "$after" --arg go_version "$go_version" \
+            --argjson repository_writes "$repository_writes" --argjson regular_files "$regular_files" \
+            --argjson physical_lines "$physical_lines" --argjson descendant_dirs "$descendant_dirs" \
+            --argjson go_files "$go_files" --argjson gooo_files "$gooo_files" --argjson go_lines "$go_lines" \
+            --argjson gooo_lines "$gooo_lines" --argjson language_files "$language_files" \
+            --argjson evaluator_wall_ms "$evaluator_wall_ms" --argjson evaluator_peak_rss_kib "$evaluator_peak_rss_kib" \
+            --argjson graph_peak_rss_kib "$graph_peak_rss_kib" --argjson scenario_output_files "$scenario_output_files" \
+            --argjson conformer_reports "$conformer_reports" --argjson artifact_files "$artifact_files" '
+            {schema:"gooo/evidence-generator/temporal-transition-ticket/runtime/v1",subject_sha:$subject_sha,
+             toolchain:{go:$go_version,go_required:"go1.27.0",released_gooo_reuse:1},
+             executions:{gooo_version:1,gooo_syntax_check:1,gooo_semantic_check:1,gooo_graph:1,
+               activity_resolution:12,transition_evaluator:19,conformer:19,normal_replay_runs:2,
+               go_build:0,go_test:0,product_build:0,product_test:0,local_test:0},
+             performance:{normal_transition_evaluator_wall_ms:$evaluator_wall_ms,
+               normal_transition_evaluator_peak_rss_kib:$evaluator_peak_rss_kib,
+               gooo_graph_peak_rss_kib:$graph_peak_rss_kib,
+               improvement:{state:"UNKNOWN",evidence:0,required:1,reason:"COMPARABLE_BEFORE_AFTER_EVIDENCE_ABSENT"}},
+             inventory:{root_readme_policy:"EXCLUDED",input_descendant_dirs:$descendant_dirs,
+               input_regular_files:$regular_files,input_physical_lines:$physical_lines,
+               input_go_files:$go_files,input_go_physical_lines:$go_lines,
+               input_gooo_files:$gooo_files,input_gooo_physical_lines:$gooo_lines,language_files:$language_files},
+             repository:{before_digest:$before,after_digest:$after,writes:$repository_writes},
+             authority:{cross_project_required_gates:0,source_repository_writes:0,local_test_executions:0,
+               input_repository_mutation:false,caller_owned_temp_output_only:true},
+             cases:{total:18,closed:1,unknown:4,refuted:13,normal_replay_runs:2,cells_per_case:12,activities:12},
+             activities:{total:12,proof:{FOUNDATION:4,COHERENCE:4,REGRESSION:4},indicator:{DRIVER:4,OUTCOME:4,GUARDRAIL:4}},
+             artifacts:{scenario_outputs:$scenario_output_files,conformer_reports:$conformer_reports,
+               metadata_files:6,total:$artifact_files}}
+          ' > "$RUNNER_TEMP/temporal-evidence/runtime.json"
+
+          jq -e '.toolchain.go=="go1.27.0" and .repository.writes==0 and .authority.cross_project_required_gates==0 and
+            .authority.local_test_executions==0 and .executions.go_build==0 and .executions.go_test==0 and
+            .executions.local_test==0 and .cases=={total:18,closed:1,unknown:4,refuted:13,normal_replay_runs:2,cells_per_case:12,activities:12} and
+            .activities=={total:12,proof:{FOUNDATION:4,COHERENCE:4,REGRESSION:4},indicator:{DRIVER:4,OUTCOME:4,GUARDRAIL:4}} and
+            .artifacts.scenario_outputs==133 and .artifacts.conformer_reports==19 and .artifacts.metadata_files==6 and .artifacts.total==158' \
+            "$RUNNER_TEMP/temporal-evidence/runtime.json" >/dev/null
+          jq -e '.repository.before_digest==.repository.after_digest and .repository.writes==0' \
+            "$RUNNER_TEMP/temporal-evidence/runtime.json" >/dev/null
+          test "$scenario_output_files" -eq 133
+          test "$conformer_reports" -eq 19
+          test "$(find "$RUNNER_TEMP/temporal-evidence" -type f | wc -l | tr -d ' ')" -eq 158
+
+          {
+            echo '## Temporal transition ticket v1'
+            jq -r '"- cases: \(.cases.total) total; \(.cases.closed) CLOSED / \(.cases.unknown) UNKNOWN / \(.cases.refuted) REFUTED; cells per case \(.cases.cells_per_case); activities \(.cases.activities)"' "$RUNNER_TEMP/temporal-evidence/runtime.json"
+            jq -r '"- activity distribution: FOUNDATION \(.activities.proof.FOUNDATION), COHERENCE \(.activities.proof.COHERENCE), REGRESSION \(.activities.proof.REGRESSION); DRIVER \(.activities.indicator.DRIVER), OUTCOME \(.activities.indicator.OUTCOME), GUARDRAIL \(.activities.indicator.GUARDRAIL)"' "$RUNNER_TEMP/temporal-evidence/runtime.json"
+            jq -r '"- normal transition: \(.toolchain.go); evaluator \(.performance.normal_transition_evaluator_wall_ms) ms / \(.performance.normal_transition_evaluator_peak_rss_kib) KiB peak RSS"' "$RUNNER_TEMP/temporal-evidence/runtime.json"
+            jq -r '"- inventory: Go \(.inventory.input_go_files) files / \(.inventory.input_go_physical_lines) lines; Gooo \(.inventory.input_gooo_files) files / \(.inventory.input_gooo_physical_lines) lines; root README \(.inventory.root_readme_policy)"' "$RUNNER_TEMP/temporal-evidence/runtime.json"
+            jq -r '"- artifacts: \(.artifacts.total) files; repository writes \(.repository.writes); local tests \(.authority.local_test_executions); cross-project gates \(.authority.cross_project_required_gates)"' "$RUNNER_TEMP/temporal-evidence/runtime.json"
+            jq -r '"- external utility: UNKNOWN; performance improvement: \(.performance.improvement.state)"' "$RUNNER_TEMP/temporal-evidence/runtime.json"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload temporal transition evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: temporal-transition-ticket-v1-${{ github.event.pull_request.head.sha || github.sha }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/temporal-evidence

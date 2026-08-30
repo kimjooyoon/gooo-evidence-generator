@@ -1,0 +1,29 @@
+{
+  "schema": "gooo/evidence-generator/temporal-transition-ticket-denominator/v1",
+  "id": "gooo://denominator/temporal-transition-ticket/v1",
+  "target_cells": 12,
+  "proof_totals": [
+    {"proof_choice": "FOUNDATION", "total": 4},
+    {"proof_choice": "COHERENCE", "total": 4},
+    {"proof_choice": "REGRESSION", "total": 4}
+  ],
+  "indicator_totals": [
+    {"indicator_class": "DRIVER", "total": 4},
+    {"indicator_class": "OUTCOME", "total": 4},
+    {"indicator_class": "GUARDRAIL", "total": 4}
+  ],
+  "cells": [
+    {"ordinal": 1, "id": "RELEASED_GOOO_IDENTITY", "activity": "ObserveReleasedTransitionCore", "stage": "CORE_RELEASE", "step": "OBSERVE_RELEASED_TRANSITION_CORE", "proof_choice": "FOUNDATION", "indicator_class": "DRIVER", "core_identity_anchor": true, "closed_reason": "RELEASED_TRANSITION_CORE_OBSERVED", "unknown_reason": "RELEASED_TRANSITION_CORE_UNAVAILABLE", "next_operation": "FETCH_PINNED_GOOO_RELEASE", "depends_on": []},
+    {"ordinal": 2, "id": "META_ACTIVITY_AUTHORITY", "activity": "BindTransitionTicketActivities", "stage": "AUTHORITY", "step": "BIND_TRANSITION_TICKET_ACTIVITIES", "proof_choice": "FOUNDATION", "indicator_class": "GUARDRAIL", "closed_reason": "TRANSITION_ACTIVITIES_BOUND", "unknown_reason": "TRANSITION_ACTIVITY_AUTHORITY_UNAVAILABLE", "next_operation": "BIND_RELEASED_TRANSITION_ACTIVITIES", "depends_on": ["RELEASED_GOOO_IDENTITY"]},
+    {"ordinal": 3, "id": "PREDECESSOR_IDENTITY", "activity": "DeclarePredecessorIdentity", "stage": "PREDECLARE", "step": "DECLARE_PREDECESSOR_IDENTITY", "proof_choice": "FOUNDATION", "indicator_class": "DRIVER", "closed_reason": "PREDECESSOR_IDENTITY_FIXED", "unknown_reason": "PREDECESSOR_IDENTITY_UNAVAILABLE", "next_operation": "RESOLVE_PREDECESSOR_IDENTITY", "depends_on": ["RELEASED_GOOO_IDENTITY"]},
+    {"ordinal": 4, "id": "PREDECESSOR_ARTIFACT_REPORT", "activity": "BindPredecessorArtifactReport", "stage": "PREDECLARE", "step": "BIND_PREDECESSOR_ARTIFACT_REPORT", "proof_choice": "FOUNDATION", "indicator_class": "DRIVER", "closed_reason": "PREDECESSOR_ARTIFACT_REPORT_FIXED", "unknown_reason": "PREDECESSOR_ARTIFACT_REPORT_MISSING", "next_operation": "RESTORE_IMMUTABLE_PREDECESSOR_ARTIFACT_REPORT", "depends_on": ["PREDECESSOR_IDENTITY"]},
+    {"ordinal": 5, "id": "PROPOSAL_TREE_EXPECTATION", "activity": "DeclareProposalTreeExpectation", "stage": "PREDECLARE", "step": "DECLARE_PROPOSAL_TREE_EXPECTATION", "proof_choice": "COHERENCE", "indicator_class": "GUARDRAIL", "closed_reason": "PROPOSAL_TREE_EXPECTATION_FIXED", "unknown_reason": "PROPOSAL_TREE_EXPECTATION_UNAVAILABLE", "next_operation": "FIX_EXPECTED_PROPOSAL_AND_TREE_DIGESTS", "depends_on": ["PREDECESSOR_IDENTITY"]},
+    {"ordinal": 6, "id": "TRANSITION_POLICY", "activity": "BindTransitionPolicy", "stage": "PREDECLARE", "step": "BIND_TRANSITION_POLICY", "proof_choice": "COHERENCE", "indicator_class": "OUTCOME", "closed_reason": "TRANSITION_POLICY_FIXED", "unknown_reason": "TRANSITION_POLICY_UNAVAILABLE", "next_operation": "FIX_POLICY_DIGEST", "depends_on": ["META_ACTIVITY_AUTHORITY", "PREDECESSOR_IDENTITY"]},
+    {"ordinal": 7, "id": "TICKET_LIFETIME_NONCE", "activity": "DeclareTicketLifetimeAndNonce", "stage": "PREDECLARE", "step": "DECLARE_TICKET_LIFETIME_AND_NONCE", "proof_choice": "COHERENCE", "indicator_class": "OUTCOME", "closed_reason": "TICKET_LIFETIME_AND_NONCE_FIXED", "unknown_reason": "TICKET_LIFETIME_OR_NONCE_UNAVAILABLE", "next_operation": "FIX_EXPIRY_POLICY_AND_NONCE", "depends_on": ["META_ACTIVITY_AUTHORITY", "TRANSITION_POLICY"]},
+    {"ordinal": 8, "id": "PREDECLARE", "activity": "PredeclareTransitionTicket", "stage": "PREDECLARE", "step": "PREDECLARE_TRANSITION_TICKET", "proof_choice": "COHERENCE", "indicator_class": "OUTCOME", "closed_reason": "TRANSITION_TICKET_PREDECLARED", "unknown_reason": "TRANSITION_TICKET_NOT_READY", "next_operation": "RESTORE_PREDECLARE_INPUTS", "depends_on": ["PREDECESSOR_ARTIFACT_REPORT", "PROPOSAL_TREE_EXPECTATION", "TRANSITION_POLICY", "TICKET_LIFETIME_NONCE"]},
+    {"ordinal": 9, "id": "SUCCESSOR_MERGE_RECEIPT", "activity": "ObserveSuccessorMergeReceipt", "stage": "CONSUME", "step": "OBSERVE_SUCCESSOR_MERGE_RECEIPT", "proof_choice": "REGRESSION", "indicator_class": "DRIVER", "closed_reason": "SUCCESSOR_MERGE_RECEIPT_MATCHES", "unknown_reason": "SUCCESSOR_MERGE_RECEIPT_UNAVAILABLE", "next_operation": "PROVIDE_TYPED_SUCCESSOR_MERGE_RECEIPT", "depends_on": ["PREDECLARE"]},
+    {"ordinal": 10, "id": "CONSUME_ONCE", "activity": "ConsumeTransitionTicketOnce", "stage": "CONSUME", "step": "CONSUME_TRANSITION_TICKET_ONCE", "proof_choice": "REGRESSION", "indicator_class": "OUTCOME", "closed_reason": "TRANSITION_TICKET_CONSUMED_ONCE", "unknown_reason": "TRANSITION_TICKET_NOT_YET_CONSUMED", "next_operation": "PROVIDE_SUCCESSOR_CONSUME_RECEIPT", "depends_on": ["PREDECLARE", "SUCCESSOR_MERGE_RECEIPT"]},
+    {"ordinal": 11, "id": "DECISION_PRECEDENCE", "activity": "EnforceTransitionDecisionPrecedence", "stage": "DECISION", "step": "ENFORCE_REFUTED_UNKNOWN_CLOSED_PRECEDENCE", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "TRANSITION_DECISION_PRECEDENCE_ENFORCED", "unknown_reason": "TRANSITION_DECISION_PRECEDENCE_UNAVAILABLE", "next_operation": "RETAIN_HIGHEST_SEVERITY_DECISION", "depends_on": ["CONSUME_ONCE"]},
+    {"ordinal": 12, "id": "HUMAN_DOSSIER", "activity": "PublishTransitionHumanDossier", "stage": "REPORT", "step": "PUBLISH_TRANSITION_HUMAN_DOSSIER", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "TRANSITION_DOSSIER_PUBLISHED", "unknown_reason": "TRANSITION_DOSSIER_UNAVAILABLE", "next_operation": "PUBLISH_CALLER_OWNED_EVIDENCE", "depends_on": ["DECISION_PRECEDENCE"]}
+  ]
+}

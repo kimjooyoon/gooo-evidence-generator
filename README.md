@@ -159,3 +159,25 @@ dependency-blocked, stale, ambiguous, unbounded, counterexample, malformed,
 `FIXED_POINT`, unrecognized-decision, and mixed cases. It writes no source
 repository files and runs no local tests. See
 [the counterexample-guided revision RFC](docs/rfcs/counterexample-guided-revision-v1.md).
+
+## PREDECLARE to CONSUME_ONCE transition ticket v1
+
+The temporal transition ticket closes the self-improvement ordering gap with
+two explicit phases. `PREDECLARE` freezes predecessor identity and immutable
+artifact/report digests, proposal and expected tree digest, target branch,
+policy/toolchain/workflow digests, proof choice, expiry policy, nonce, and
+ticket ID before a successor runs. `CONSUME_ONCE` closes only when the actual
+successor, PR/merge receipt, and all frozen identities match; ticket reuse is
+`REFUTED`. A squash merge commit SHA is intentionally resolved later through a
+typed mapping from `expected_tree_digest` to the merge receipt tree digest.
+
+The new contract keeps a fixed 12-cell denominator and 12 released Gooo
+activities, with `FOUNDATION 4 / COHERENCE 4 / REGRESSION 4` and
+`DRIVER 4 / OUTCOME 4 / GUARDRAIL 4`. CI covers 18 exact cases: one normal
+case, four UNKNOWN cases, and thirteen REFUTED cases, including mixed
+`REFUTED`-over-`UNKNOWN`, post-hoc and retroactive closure rejection, digest
+laundering, and authority/write escalation. It records 158 caller-owned
+artifact files, repository writes `0`, local test executions `0`, and required
+cross-project gates `0`; external utility and performance improvement remain
+`UNKNOWN` without independent evidence. See
+[the temporal transition ticket RFC](docs/rfcs/temporal-transition-ticket-v1.md).
