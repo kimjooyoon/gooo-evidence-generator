@@ -154,7 +154,7 @@ jobs:
           run_case replay-reuse "$scenarios/replay-reuse.json" replay-reuse conform-replay-reuse.json
           run_case digest-laundering "$scenarios/digest-laundering.json" digest-laundering conform-digest-laundering.json
           run_case unknown-top-level-decision "$scenarios/unknown-top-level-decision.json" unknown-top-level-decision conform-unknown-top-level-decision.json
-          run_case post-hoc-ticket "$scenarios/post-hoc-ticket.json" post-hoc-ticket post-hoc-ticket.json
+          run_case post-hoc-ticket "$scenarios/post-hoc-ticket.json" post-hoc-ticket conform-post-hoc-ticket.json
           run_case retroactive-closure "$scenarios/retroactive-closure.json" retroactive-closure conform-retroactive-closure.json
           run_case authority-write-escalation "$scenarios/authority-write-escalation.json" authority-write-escalation conform-authority-write-escalation.json
           run_case mixed "$scenarios/mixed.json" mixed conform-mixed.json
