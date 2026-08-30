@@ -193,7 +193,7 @@ jobs:
             > "$RUNNER_TEMP/reuse-receipt.json"
           reuse_receipt_digest=$(sha256sum "$RUNNER_TEMP/reuse-receipt.json" | awk '{print $1}')
 
-          activity_refs=$(jq -c -S \
+          jq -c -S \
             --arg resolution_digest "$resolution_digest" --arg graph_hash "$graph_hash" \
             --slurpfile denominator contracts/execution-observation-denominator-v1.json \
             --slurpfile resolution "$resolution" '
@@ -202,8 +202,7 @@ jobs:
               {cell_id:$cell.id,activity_id:$cell.id,activity:$cell.activity,graph_role:"meta_graph",
                graph_hash:$graph_hash,semantic_digest:$entry.receipt.subject.semantic_digest,
                activity_resolution_digest:$resolution_digest}]
-          ')
-          printf '%s\n' "$activity_refs" > "$RUNNER_TEMP/activity-refs.json"
+          ' > "$RUNNER_TEMP/activity-refs.json"
 
           jq -S -n \
             --arg subject_sha "$SUBJECT_SHA" --arg graph_hash "$graph_hash" \
