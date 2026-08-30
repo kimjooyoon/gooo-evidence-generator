@@ -101,3 +101,21 @@ Release identity may be serialized in either of two structures:
 
 CI preserves both structures byte-for-byte within each generated bundle. The
 generator normalizes only the fields needed for validation.
+
+## Transformation effect receipt v1
+
+The next self-improvement increment keeps source mutation forbidden and asks a
+narrower question: can one evidence-backed, meta-bound candidate improve one
+pinned generated-project fixture without changing its denominator or unrelated
+cells?
+
+The candidate is selected from the existing four-project repetition
+observation. CI applies it only to a caller-owned temporary copy, evaluates an
+exact `11 CLOSED / 1 UNKNOWN` before state and `12 CLOSED / 0 UNKNOWN` after
+state, performs deterministic replay, and runs an independent conformer. A
+known counterexample is REFUTED even when candidate evidence is also missing.
+
+This closes one exact fixture pair, not a general language-value claim.
+Independent external adoption remains `0/1 UNKNOWN`, build and test executions
+remain zero, and the repository is never edited by the candidate. See
+[the v1 effect RFC](docs/rfcs/transformation-effect-receipt-v1.md).

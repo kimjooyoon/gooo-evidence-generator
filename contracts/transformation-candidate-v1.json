@@ -1,0 +1,34 @@
+{
+  "schema": "gooo/evidence-generator/transformation-candidate/v1",
+  "id": "gooo://candidate/add-explicit-unknown-to-generated-project/v1",
+  "source_observation_id": "gooo://observation/four-public-evidence-projects/v1",
+  "target_denominator_id": "gooo://denominator/self-hosted-evidence-generator/v1",
+  "selection": {
+    "pattern_id": "explicit-unknown",
+    "minimum_support": 3,
+    "expected_support": 4,
+    "support_total": 4,
+    "required_meta_activity": "PreserveUnknownTrace"
+  },
+  "operation": {
+    "kind": "CLOSE_ONE_UNKNOWN_CELL",
+    "target_cell_id": "UNKNOWN_TRACE",
+    "from_state": "UNKNOWN",
+    "to_state": "CLOSED",
+    "closed_reason": "META_BOUND_EXPLICIT_UNKNOWN_PATTERN_APPLIED"
+  },
+  "expected_effect": {
+    "before": {"total": 12, "closed": 11, "unknown": 1, "refuted": 0},
+    "after": {"total": 12, "closed": 12, "unknown": 0, "refuted": 0},
+    "delta": {"total": 0, "closed": 1, "unknown": -1, "refuted": 0},
+    "target_cell_transitions": 1,
+    "unrelated_cell_changes": 0
+  },
+  "authority": {
+    "application_root": "CALLER_OWNED_TEMP_ONLY",
+    "repository_writes": 0,
+    "denominator_changes": 0,
+    "automatic_source_promotion": "FORBIDDEN",
+    "external_utility_claim": "UNKNOWN_UNTIL_INDEPENDENT_ADOPTION"
+  }
+}

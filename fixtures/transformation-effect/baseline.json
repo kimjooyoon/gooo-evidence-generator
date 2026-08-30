@@ -1,0 +1,22 @@
+{
+  "schema": "gooo/evidence-generator/transformation-baseline/v1",
+  "id": "gooo://fixture/transformation-effect/explicit-unknown-missing/v1",
+  "denominator_id": "gooo://denominator/self-hosted-evidence-generator/v1",
+  "subject_id": "gooo://project/self-hosted-evidence-generator/before-explicit-unknown/v1",
+  "repository_writes": 0,
+  "local_test_executions": 0,
+  "cells": [
+    {"id": "RELEASED_GOOO_IDENTITY", "state": "CLOSED", "stage": null, "step": null, "reason": "RELEASED_GOOO_IDENTITY_OBSERVED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "PATTERN_OBSERVATION", "state": "CLOSED", "stage": null, "step": null, "reason": "PATTERN_SUPPORT_OBSERVED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "PROMOTION_POLICY", "state": "CLOSED", "stage": null, "step": null, "reason": "PROMOTION_THRESHOLD_APPLIED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "PROJECT_AUTHORITY", "state": "CLOSED", "stage": null, "step": null, "reason": "GENERATED_PROJECT_AUTHORITY_DECLARED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "DENOMINATOR_OUTPUT", "state": "CLOSED", "stage": null, "step": null, "reason": "DENOMINATOR_GENERATED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "ACTIVITY_BINDINGS_OUTPUT", "state": "CLOSED", "stage": null, "step": null, "reason": "CORE_ACTIVITY_RESOLUTIONS_BOUND", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "CONFORMANCE_PLAN_OUTPUT", "state": "CLOSED", "stage": null, "step": null, "reason": "CONFORMANCE_PLAN_GENERATED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "GENERATION_RECEIPT", "state": "CLOSED", "stage": null, "step": null, "reason": "GENERATION_RECEIPT_PUBLISHED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "DETERMINISTIC_REPLAY", "state": "CLOSED", "stage": null, "step": null, "reason": "DETERMINISTIC_REPLAY_DECLARED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "ZERO_SOURCE_WRITE", "state": "CLOSED", "stage": null, "step": null, "reason": "ZERO_SOURCE_WRITE_DECLARED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []},
+    {"id": "UNKNOWN_TRACE", "state": "UNKNOWN", "stage": "UNCERTAINTY", "step": "PRESERVE_UNKNOWN_TRACE", "reason": "EXPLICIT_UNKNOWN_PATTERN_MISSING", "unknown_class": "DIRECT_MISSING", "next_operation": "APPLY_META_BOUND_EXPLICIT_UNKNOWN_PATTERN", "blocked_by": []},
+    {"id": "REFUTATION_TRACE", "state": "CLOSED", "stage": null, "step": null, "reason": "REFUTATION_TRACE_DECLARED", "unknown_class": null, "next_operation": "NONE", "blocked_by": []}
+  ]
+}

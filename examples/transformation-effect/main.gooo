@@ -1,0 +1,29 @@
+package transformationeffect
+namespace transformationeffect
+
+entity ReleasedImprovementCore id "gooo://transformation-effect/entity/released-core"
+entity TransformationEffectActivities id "gooo://transformation-effect/entity/meta-activities"
+entity CandidatePatternSupport id "gooo://transformation-effect/entity/pattern-support"
+entity MetaBoundCandidate id "gooo://transformation-effect/entity/candidate"
+entity BaselineProjectSnapshot id "gooo://transformation-effect/entity/baseline"
+entity IsolatedCandidateApplication id "gooo://transformation-effect/entity/application"
+entity BeforeAfterEvaluation id "gooo://transformation-effect/entity/before-after"
+entity ExactTransformationEffect id "gooo://transformation-effect/entity/effect"
+entity FixedDenominator id "gooo://transformation-effect/entity/denominator"
+entity TransformationReplay id "gooo://transformation-effect/entity/replay"
+entity TransformationUnknown id "gooo://transformation-effect/entity/unknown"
+entity TransformationCounterexample id "gooo://transformation-effect/entity/counterexample"
+entity TransformationDecision id "gooo://transformation-effect/entity/decision"
+
+activity ObserveReleasedImprovementCore(ReleasedImprovementCore) -> TransformationDecision
+activity BindTransformationEffectActivities(TransformationEffectActivities) -> TransformationDecision
+activity ObserveCandidatePatternSupport(CandidatePatternSupport) -> TransformationDecision
+activity SelectMetaBoundCandidate(MetaBoundCandidate) -> TransformationDecision
+activity PinBaselineProjectSnapshot(BaselineProjectSnapshot) -> TransformationDecision
+activity ApplyCandidateToIsolatedProject(IsolatedCandidateApplication) -> TransformationDecision
+activity EvaluateCandidateBeforeAndAfter(BeforeAfterEvaluation) -> TransformationDecision
+activity PublishExactTransformationEffect(ExactTransformationEffect) -> TransformationDecision
+activity PreserveFixedDenominator(FixedDenominator) -> TransformationDecision
+activity VerifyTransformationReplay(TransformationReplay) -> TransformationDecision
+activity PreserveTransformationUnknown(TransformationUnknown) -> TransformationDecision
+activity RefuteTransformationCounterexample(TransformationCounterexample) -> TransformationDecision

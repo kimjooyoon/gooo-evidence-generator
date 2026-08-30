@@ -1,0 +1,29 @@
+{
+  "schema": "gooo/evidence-generator/transformation-effect-denominator/v1",
+  "id": "gooo://denominator/transformation-effect-receipt/v1",
+  "target_cells": 12,
+  "proof_totals": [
+    {"proof_choice": "FOUNDATION", "total": 4},
+    {"proof_choice": "COHERENCE", "total": 4},
+    {"proof_choice": "REGRESSION", "total": 4}
+  ],
+  "indicator_totals": [
+    {"indicator_class": "DRIVER", "total": 4},
+    {"indicator_class": "OUTCOME", "total": 4},
+    {"indicator_class": "GUARDRAIL", "total": 4}
+  ],
+  "cells": [
+    {"ordinal": 1, "id": "RELEASED_GOOO_IDENTITY", "activity": "ObserveReleasedImprovementCore", "stage": "CORE_RELEASE", "step": "OBSERVE_RELEASED_IMPROVEMENT_CORE", "proof_choice": "FOUNDATION", "indicator_class": "DRIVER", "closed_reason": "RELEASED_IMPROVEMENT_CORE_OBSERVED", "depends_on": []},
+    {"ordinal": 2, "id": "META_ACTIVITY_AUTHORITY", "activity": "BindTransformationEffectActivities", "stage": "META_AUTHORITY", "step": "BIND_TRANSFORMATION_EFFECT_ACTIVITIES", "proof_choice": "FOUNDATION", "indicator_class": "GUARDRAIL", "closed_reason": "TRANSFORMATION_EFFECT_ACTIVITIES_BOUND", "depends_on": ["RELEASED_GOOO_IDENTITY"]},
+    {"ordinal": 3, "id": "PATTERN_OBSERVATION", "activity": "ObserveCandidatePatternSupport", "stage": "OBSERVATION", "step": "OBSERVE_CANDIDATE_PATTERN_SUPPORT", "proof_choice": "FOUNDATION", "indicator_class": "DRIVER", "closed_reason": "CANDIDATE_PATTERN_SUPPORT_OBSERVED", "depends_on": ["META_ACTIVITY_AUTHORITY"]},
+    {"ordinal": 4, "id": "CANDIDATE_SELECTION", "activity": "SelectMetaBoundCandidate", "stage": "SELECTION", "step": "SELECT_META_BOUND_CANDIDATE", "proof_choice": "FOUNDATION", "indicator_class": "OUTCOME", "closed_reason": "META_BOUND_CANDIDATE_SELECTED", "depends_on": ["PATTERN_OBSERVATION"]},
+    {"ordinal": 5, "id": "BASELINE_SNAPSHOT", "activity": "PinBaselineProjectSnapshot", "stage": "BASELINE", "step": "PIN_BASELINE_PROJECT_SNAPSHOT", "proof_choice": "COHERENCE", "indicator_class": "DRIVER", "closed_reason": "BASELINE_PROJECT_SNAPSHOT_PINNED", "depends_on": ["META_ACTIVITY_AUTHORITY"]},
+    {"ordinal": 6, "id": "ISOLATED_APPLICATION", "activity": "ApplyCandidateToIsolatedProject", "stage": "APPLICATION", "step": "APPLY_CANDIDATE_TO_ISOLATED_PROJECT", "proof_choice": "COHERENCE", "indicator_class": "OUTCOME", "closed_reason": "CANDIDATE_APPLIED_TO_ISOLATED_PROJECT", "depends_on": ["CANDIDATE_SELECTION", "BASELINE_SNAPSHOT"]},
+    {"ordinal": 7, "id": "BEFORE_AFTER_EVALUATION", "activity": "EvaluateCandidateBeforeAndAfter", "stage": "EVALUATION", "step": "EVALUATE_CANDIDATE_BEFORE_AND_AFTER", "proof_choice": "COHERENCE", "indicator_class": "DRIVER", "closed_reason": "CANDIDATE_BEFORE_AFTER_EVALUATED", "depends_on": ["ISOLATED_APPLICATION"]},
+    {"ordinal": 8, "id": "EXACT_EFFECT_RECEIPT", "activity": "PublishExactTransformationEffect", "stage": "EFFECT", "step": "PUBLISH_EXACT_TRANSFORMATION_EFFECT", "proof_choice": "COHERENCE", "indicator_class": "OUTCOME", "closed_reason": "EXACT_TRANSFORMATION_EFFECT_PUBLISHED", "depends_on": ["BEFORE_AFTER_EVALUATION"]},
+    {"ordinal": 9, "id": "DENOMINATOR_PRESERVATION", "activity": "PreserveFixedDenominator", "stage": "GUARDRAIL", "step": "PRESERVE_FIXED_DENOMINATOR", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "FIXED_DENOMINATOR_PRESERVED", "depends_on": ["BASELINE_SNAPSHOT", "ISOLATED_APPLICATION"]},
+    {"ordinal": 10, "id": "DETERMINISTIC_REPLAY", "activity": "VerifyTransformationReplay", "stage": "REPLAY", "step": "VERIFY_TRANSFORMATION_REPLAY", "proof_choice": "REGRESSION", "indicator_class": "OUTCOME", "closed_reason": "TRANSFORMATION_REPLAY_VERIFIED", "depends_on": ["EXACT_EFFECT_RECEIPT", "DENOMINATOR_PRESERVATION"]},
+    {"ordinal": 11, "id": "UNKNOWN_CAUSALITY", "activity": "PreserveTransformationUnknown", "stage": "UNCERTAINTY", "step": "PRESERVE_TRANSFORMATION_UNKNOWN", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "TRANSFORMATION_UNKNOWN_CAUSALITY_PRESERVED", "depends_on": ["META_ACTIVITY_AUTHORITY"]},
+    {"ordinal": 12, "id": "REFUTED_COUNTEREXAMPLE", "activity": "RefuteTransformationCounterexample", "stage": "REFUTATION", "step": "REFUTE_TRANSFORMATION_COUNTEREXAMPLE", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "TRANSFORMATION_COUNTEREXAMPLE_REFUTED", "depends_on": ["META_ACTIVITY_AUTHORITY"]}
+  ]
+}
