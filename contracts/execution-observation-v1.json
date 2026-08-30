@@ -1,0 +1,60 @@
+{
+  "schema": "gooo/evidence-generator/execution-observation/v1",
+  "status_values": [
+    "EXECUTED",
+    "REUSED",
+    "NOT_EXECUTED",
+    "UNKNOWN"
+  ],
+  "wall_ms": {
+    "required_for": [
+      "EXECUTED"
+    ],
+    "null_for": [
+      "REUSED",
+      "NOT_EXECUTED",
+      "UNKNOWN"
+    ],
+    "minimum": 0,
+    "unit": "milliseconds",
+    "type": "integer"
+  },
+  "peak_rss_kib": {
+    "available_field": "peak_rss_kib_available",
+    "value_field": "peak_rss_kib",
+    "unavailable_value": null,
+    "unit": "KiB"
+  },
+  "cache": {
+    "required_fields": [
+      "state",
+      "key",
+      "digest",
+      "authority"
+    ],
+    "states": [
+      "HIT",
+      "MISS",
+      "NOT_APPLICABLE",
+      "UNKNOWN"
+    ],
+    "authority_must_be_explicit": true
+  },
+  "improvement_boundary": {
+    "requires_exact_before_after": true,
+    "missing_pair_state": "UNKNOWN",
+    "unexecuted_work_is_success": false
+  },
+  "required_identity_fields": [
+    "runner_digest",
+    "toolchain_digest",
+    "input_digest",
+    "activity_resolution_digest"
+  ],
+  "authority": {
+    "activity_source": "released_semantic_graph",
+    "measurement_source": "direct_command_receipt",
+    "cache_source": "explicit_receipt_or_released_artifact",
+    "log_parsing_authority": false
+  }
+}

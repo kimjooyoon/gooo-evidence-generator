@@ -1,0 +1,417 @@
+name: Build test and verified reuse observation v1
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  execution-observation:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.0'
+          cache: false
+
+      - name: Bind subject and read-only source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "SUBJECT_SHA=${{ github.event.pull_request.head.sha || github.sha }}" >> "$GITHUB_ENV"
+          snapshot() {
+            find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -print0 |
+              sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+          }
+          snapshot > "$RUNNER_TEMP/repository-before"
+
+      - name: Acquire and verify pinned released Gooo
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock=contracts/core-release-lock-v1.json
+          tag=$(jq -r '.tag' "$lock")
+          expected_tag_object=$(jq -r '.tag_object_sha' "$lock")
+          expected_target=$(jq -r '.target_commit_sha' "$lock")
+          asset_name=$(jq -r '.assets[0].name' "$lock")
+          expected_digest=$(jq -r '.assets[0].sha256' "$lock")
+
+          gh api "repos/kimjooyoon/meta-ontology-go/git/ref/tags/$tag" > "$RUNNER_TEMP/tag-ref.json"
+          jq -e --arg sha "$expected_tag_object" '.object.type=="tag" and .object.sha==$sha' "$RUNNER_TEMP/tag-ref.json" >/dev/null
+          gh api "repos/kimjooyoon/meta-ontology-go/git/tags/$expected_tag_object" > "$RUNNER_TEMP/tag-object.json"
+          jq -e --arg sha "$expected_target" '.object.type=="commit" and .object.sha==$sha' "$RUNNER_TEMP/tag-object.json" >/dev/null
+          gh api "repos/kimjooyoon/meta-ontology-go/releases/tags/$tag" > "$RUNNER_TEMP/release.json"
+          asset_id=$(jq -r --arg name "$asset_name" '.assets[]|select(.name==$name)|.id' "$RUNNER_TEMP/release.json")
+          test -n "$asset_id"
+          archive="$RUNNER_TEMP/$asset_name"
+          gh api -H 'Accept: application/octet-stream' "repos/kimjooyoon/meta-ontology-go/releases/assets/$asset_id" > "$archive"
+          printf '%s  %s\n' "$expected_digest" "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          chmod +x "$RUNNER_TEMP/gooo"
+          echo "GOOO_BIN=$RUNNER_TEMP/gooo" >> "$GITHUB_ENV"
+
+      - name: Bind execution observation activities to the released semantic graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file=examples/execution-observation/main.gooo
+          "$GOOO_BIN" version --json > "$RUNNER_TEMP/execution-version.json"
+          "$GOOO_BIN" check --json "$source_file" > "$RUNNER_TEMP/execution-syntax.json"
+          "$GOOO_BIN" graph dump "$source_file" > "$RUNNER_TEMP/execution-graph.json"
+          jq -e '.schema_version=="gooo-version/v1" and .language=="gooo"' "$RUNNER_TEMP/execution-version.json" >/dev/null
+          jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok"' "$RUNNER_TEMP/execution-syntax.json" >/dev/null
+          jq -e '.schema_version=="gooo-graph/v1" and .ir.status=="available"' "$RUNNER_TEMP/execution-graph.json" >/dev/null
+
+          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"meta_graph",
+            selectors:[.cells[]|{ordinal,id,activity,selector:{name:.activity}}]}' \
+            contracts/execution-observation-denominator-v1.json > "$RUNNER_TEMP/execution-selectors.json"
+          bash scripts/bind-activity-resolutions.sh \
+            "$GOOO_BIN" "$source_file" "$RUNNER_TEMP/execution-graph.json" \
+            "$RUNNER_TEMP/execution-selectors.json" contracts/core-release-lock-v1.json \
+            "$RUNNER_TEMP/resolved-execution-graph.json" meta_graph
+          jq -e '.activity_resolution_observation.summary=={expected:12,observed:12,closed:12,unknown:0,refuted:0,unique_selectors:12}' \
+            "$RUNNER_TEMP/resolved-execution-graph.json" >/dev/null
+
+      - name: Prepare released generator graph and evidence-build inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file=examples/self-hosted-generator/main.gooo
+          "$GOOO_BIN" check --json "$source_file" > "$RUNNER_TEMP/generator-syntax.json"
+          "$GOOO_BIN" check --semantic --json "$source_file" > "$RUNNER_TEMP/generator-semantic.json"
+          "$GOOO_BIN" graph dump "$source_file" > "$RUNNER_TEMP/generator-graph.json"
+          jq -e '.schema_version=="gooo/diagnostics/v1" and .status=="ok" and .semantic_hash!=null' "$RUNNER_TEMP/generator-semantic.json" >/dev/null
+          jq -e '.schema_version=="gooo-graph/v1" and .ir.status=="available"' "$RUNNER_TEMP/generator-graph.json" >/dev/null
+
+          jq -S '
+            [.patterns[]|select(.meta_activity!=null)] | to_entries |
+            {schema:"gooo/evidence-generator/activity-selector-set/v1",role:"meta_graph",
+             selectors:[.[]|{ordinal:(.key+1),id:.value.id,activity:.value.meta_activity,selector:{name:.value.meta_activity}}]}
+          ' contracts/repetition-observation-v1.json > "$RUNNER_TEMP/generator-meta-selectors.json"
+          jq -S '{schema:"gooo/evidence-generator/activity-selector-set/v1",role:"project_graph",
+            selectors:[.cells[]|{ordinal,id,activity,selector:{name:.activity}}]}' \
+            contracts/evidence-generator-denominator-v1.json > "$RUNNER_TEMP/generator-project-selectors.json"
+          bash scripts/bind-activity-resolutions.sh \
+            "$GOOO_BIN" "$source_file" "$RUNNER_TEMP/generator-graph.json" \
+            "$RUNNER_TEMP/generator-meta-selectors.json" contracts/core-release-lock-v1.json \
+            "$RUNNER_TEMP/resolved-generator-meta-graph.json" meta_graph
+          bash scripts/bind-activity-resolutions.sh \
+            "$GOOO_BIN" "$source_file" "$RUNNER_TEMP/generator-graph.json" \
+            "$RUNNER_TEMP/generator-project-selectors.json" contracts/core-release-lock-v1.json \
+            "$RUNNER_TEMP/resolved-generator-project-graph.json" project_graph
+          jq -e '.activity_resolution_observation.summary=={expected:11,observed:11,closed:11,unknown:0,refuted:0,unique_selectors:11}' \
+            "$RUNNER_TEMP/resolved-generator-meta-graph.json" >/dev/null
+          jq -e '.activity_resolution_observation.summary=={expected:12,observed:12,closed:12,unknown:0,refuted:0,unique_selectors:12}' \
+            "$RUNNER_TEMP/resolved-generator-project-graph.json" >/dev/null
+
+      - name: Measure evidence build and test stages, then publish exact reuse receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          denominator=contracts/evidence-generator-denominator-v1.json
+          observation=contracts/repetition-observation-v1.json
+          profile=fixtures/self-hosted-generator/project.json
+          source_file=examples/execution-observation/main.gooo
+          resolution="$RUNNER_TEMP/resolved-execution-graph.json"
+
+          source_digest=$(sha256sum "$source_file" | awk '{print $1}')
+          denominator_digest=$(sha256sum contracts/execution-observation-denominator-v1.json | awk '{print $1}')
+          lock_digest=$(sha256sum contracts/core-release-lock-v1.json | awk '{print $1}')
+          workflow_digest=$(sha256sum .github/workflows/execution-observation-v1.yml | awk '{print $1}')
+          resolution_digest=$(jq -S -c . "$resolution" | sha256sum | awk '{print $1}')
+          graph_hash=$(jq -r '.graph_hash' "$resolution")
+          semantic_digest=$(jq -r '.ir.semantic_digest' "$resolution")
+          core_tag=$(jq -r '.activity_resolution_observation.core_release.tag' "$resolution")
+          core_target=$(jq -r '.activity_resolution_observation.core_release.target_commit_sha' "$resolution")
+          core_binary_digest=$(jq -r '.activity_resolution_observation.core_release.binary_sha256' "$resolution")
+          go_version=$(go version | awk '{print $3}')
+          binary_digest=$(sha256sum "$GOOO_BIN" | awk '{print $1}')
+
+          jq -S -n \
+            --arg name "$RUNNER_NAME" --arg os "$RUNNER_OS" --arg arch "$RUNNER_ARCH" \
+            --arg image "ubuntu-24.04" --arg run_id "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" \
+            '{name:$name,os:$os,arch:$arch,image:$image,run_id:$run_id,attempt:$attempt}' > "$RUNNER_TEMP/runner.json"
+          runner_digest=$(jq -S -c . "$RUNNER_TEMP/runner.json" | sha256sum | awk '{print $1}')
+          jq -S -n \
+            --arg go "$go_version" --arg tag "$core_tag" --arg target "$core_target" \
+            --arg binary "$binary_digest" --arg locked_binary "$core_binary_digest" --arg workflow "$workflow_digest" \
+            '{go:$go,gooo:{tag:$tag,target_commit_sha:$target,binary_sha256:$binary,locked_binary_sha256:$locked_binary},workflow_digest:$workflow}' \
+            > "$RUNNER_TEMP/toolchain.json"
+          toolchain_digest=$(jq -S -c . "$RUNNER_TEMP/toolchain.json" | sha256sum | awk '{print $1}')
+
+          jq -S -n \
+            --arg source_digest "$source_digest" --arg denominator_digest "$denominator_digest" \
+            --arg lock_digest "$lock_digest" --arg resolution_digest "$resolution_digest" \
+            --arg workflow_digest "$workflow_digest" --arg semantic_digest "$semantic_digest" \
+            '{source_digest:$source_digest,denominator_digest:$denominator_digest,core_lock_digest:$lock_digest,
+              activity_resolution_digest:$resolution_digest,semantic_digest:$semantic_digest,workflow_digest:$workflow_digest}' \
+            > "$RUNNER_TEMP/input-scope.json"
+          scope_digest=$(jq -S -c . "$RUNNER_TEMP/input-scope.json" | sha256sum | awk '{print $1}')
+
+          start_ns=$(date +%s%N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/evidence-build-rss" \
+            bash scripts/generate.sh "$GITHUB_WORKSPACE" \
+              "$RUNNER_TEMP/resolved-generator-meta-graph.json" \
+              "$RUNNER_TEMP/resolved-generator-project-graph.json" \
+              "$denominator" "$observation" "$profile" \
+              "$RUNNER_TEMP/evidence-build" "$SUBJECT_SHA" execution-observation-build
+          end_ns=$(date +%s%N)
+          evidence_build_wall_ms=$(( (end_ns-start_ns+999999)/1000000 ))
+          evidence_build_rss=$(cat "$RUNNER_TEMP/evidence-build-rss")
+          jq -e '.decision=="PROJECT_GENERATED" and .summary.closed==12 and .summary.unknown==0 and .summary.refuted==0' \
+            "$RUNNER_TEMP/evidence-build/generation-report.json" >/dev/null
+          evidence_build_result_digest=$(jq -S -c . "$RUNNER_TEMP/evidence-build/generation-manifest.json" | sha256sum | awk '{print $1}')
+
+          start_ns=$(date +%s%N)
+          /usr/bin/time -f '%M' -o "$RUNNER_TEMP/verification-test-rss" \
+            bash scripts/verify.sh "$RUNNER_TEMP/evidence-build" "$RUNNER_TEMP/verification-test.json"
+          end_ns=$(date +%s%N)
+          verification_test_wall_ms=$(( (end_ns-start_ns+999999)/1000000 ))
+          verification_test_rss=$(cat "$RUNNER_TEMP/verification-test-rss")
+          jq -e '.decision=="GENERATION_VERIFIED" and .summary.total==6 and .summary.closed==6 and .summary.unknown==0 and .summary.refuted==0' \
+            "$RUNNER_TEMP/verification-test.json" >/dev/null
+          verification_test_result_digest=$(sha256sum "$RUNNER_TEMP/verification-test.json" | awk '{print $1}')
+
+          jq -S -n \
+            --arg input_digest "$scope_digest" --arg result_digest "$verification_test_result_digest" \
+            --arg resolution_digest "$resolution_digest" --arg runner_digest "$runner_digest" \
+            --arg toolchain_digest "$toolchain_digest" \
+            '{schema:"gooo/evidence-generator/execution-reuse-receipt/v1",decision:"PASS",
+              producer_stage_id:"SEMANTIC_TEST",producer_activity_id:"TEST_STAGE",
+              input_digest:$input_digest,result_digest:$result_digest,
+              activity_resolution_digest:$resolution_digest,runner_digest:$runner_digest,
+              toolchain_digest:$toolchain_digest,consumer_executions:0,
+              authority:{source:"RELEASED_SEMANTIC_GRAPH_AND_EXACT_TEST_RECEIPT",repository_writes:0,source_mutations:0}}' \
+            > "$RUNNER_TEMP/reuse-receipt.json"
+          reuse_receipt_digest=$(sha256sum "$RUNNER_TEMP/reuse-receipt.json" | awk '{print $1}')
+
+          activity_refs=$(jq -c -S \
+            --arg resolution_digest "$resolution_digest" --arg graph_hash "$graph_hash" \
+            --slurpfile denominator contracts/execution-observation-denominator-v1.json \
+            --slurpfile resolution "$resolution" '
+            [$denominator[0].cells[] as $cell |
+              ($resolution[0].activity_resolution_observation.entries[]|select(.id==$cell.id and .activity==$cell.activity)) as $entry |
+              {cell_id:$cell.id,activity_id:$cell.id,activity:$cell.activity,graph_role:"meta_graph",
+               graph_hash:$graph_hash,semantic_digest:$entry.receipt.subject.semantic_digest,
+               activity_resolution_digest:$resolution_digest}]
+          ')
+
+          jq -S -n \
+            --arg subject_sha "$SUBJECT_SHA" --arg graph_hash "$graph_hash" \
+            --arg source_digest "$source_digest" --arg semantic_digest "$semantic_digest" \
+            --arg resolution_digest "$resolution_digest" --arg scope_digest "$scope_digest" \
+            --arg denominator_digest "$denominator_digest" --arg lock_digest "$lock_digest" \
+            --arg workflow_digest "$workflow_digest" --arg runner_digest "$runner_digest" \
+            --arg toolchain_digest "$toolchain_digest" --arg core_tag "$core_tag" \
+            --arg core_target "$core_target" --arg core_binary_digest "$core_binary_digest" \
+            --arg build_result_digest "$evidence_build_result_digest" \
+            --arg test_result_digest "$verification_test_result_digest" \
+            --arg reuse_receipt_digest "$reuse_receipt_digest" \
+            --argjson build_wall_ms "$evidence_build_wall_ms" --argjson build_rss "$evidence_build_rss" \
+            --argjson test_wall_ms "$verification_test_wall_ms" --argjson test_rss "$verification_test_rss" \
+            --slurpfile runner "$RUNNER_TEMP/runner.json" --slurpfile toolchain "$RUNNER_TEMP/toolchain.json" \
+            --argjson activity_refs "$activity_refs" \
+            '{schema:"gooo/evidence-generator/execution-observation/v1",subject_sha:$subject_sha,
+              authority:{graph_role:"meta_graph",graph_hash:$graph_hash,source_file:"examples/execution-observation/main.gooo",
+                source_digest:$source_digest,semantic_digest:$semantic_digest,activity_resolution_digest:$resolution_digest,
+                core_release:{repository:"kimjooyoon/meta-ontology-go",tag:$core_tag,target_commit_sha:$core_target,binary_sha256:$core_binary_digest},
+                repository_writes:0,consumer_test_executions:0,local_test_executions:0},
+              runner:$runner[0],toolchain:$toolchain[0],
+              inputs:{scope_digest:$scope_digest,source_digest:$source_digest,denominator_digest:$denominator_digest,
+                core_lock_digest:$lock_digest,activity_resolution_digest:$resolution_digest,workflow_digest:$workflow_digest},
+              not_applicable:{product_build:{status:"NOT_APPLICABLE",wall_ms:null,activity_id:"BUILD_STAGE",activity:"ObserveBuildStage",
+                  reason:"NO_PRODUCT_BUILD_TARGET_IN_EVIDENCE_GENERATOR_REPOSITORY"},
+                product_test:{status:"NOT_APPLICABLE",wall_ms:null,activity_id:"TEST_STAGE",activity:"ObserveTestStage",
+                  reason:"NO_PRODUCT_TEST_TARGET_IN_EVIDENCE_GENERATOR_REPOSITORY"}},
+              activity_refs:$activity_refs,
+              stages:[
+                {id:"EVIDENCE_BUILD",kind:"BUILD",activity_id:"BUILD_STAGE",activity:"ObserveBuildStage",status:"EXECUTED",
+                 wall_ms:$build_wall_ms,peak_rss_kib:$build_rss,peak_rss_kib_available:true,
+                 runner_digest:$runner_digest,toolchain_digest:$toolchain_digest,input_digest:$scope_digest,
+                 activity_resolution_digest:$resolution_digest,result_digest:$build_result_digest,
+                 command:["bash","scripts/generate.sh"],cache:{state:"NOT_APPLICABLE",key:null,digest:null,authority:"NONE"}},
+                {id:"SEMANTIC_TEST",kind:"TEST",activity_id:"TEST_STAGE",activity:"ObserveTestStage",status:"EXECUTED",
+                 wall_ms:$test_wall_ms,peak_rss_kib:$test_rss,peak_rss_kib_available:true,
+                 runner_digest:$runner_digest,toolchain_digest:$toolchain_digest,input_digest:$scope_digest,
+                 activity_resolution_digest:$resolution_digest,result_digest:$test_result_digest,
+                 command:["bash","scripts/verify.sh"],cache:{state:"NOT_APPLICABLE",key:null,digest:null,authority:"NONE"}},
+                {id:"VERIFIED_TEST_RECEIPT_REUSE",kind:"REUSE",activity_id:"REUSED_WORK",activity:"ObserveVerifiedReuse",status:"REUSED",
+                 wall_ms:null,peak_rss_kib:null,peak_rss_kib_available:false,
+                 runner_digest:$runner_digest,toolchain_digest:$toolchain_digest,input_digest:$scope_digest,
+                 activity_resolution_digest:$resolution_digest,result_digest:$test_result_digest,
+                 command:[],cache:{state:"HIT",key:("test-receipt:"+$scope_digest),digest:$reuse_receipt_digest,
+                   authority:"RELEASED_SEMANTIC_GRAPH_AND_EXACT_TEST_RECEIPT"},
+                 reuse_receipt:{schema:"gooo/evidence-generator/execution-reuse-receipt/v1",digest:$reuse_receipt_digest,
+                   decision:"PASS",producer_stage_id:"SEMANTIC_TEST",producer_activity_id:"TEST_STAGE",
+                   input_digest:$scope_digest,result_digest:$test_result_digest,activity_resolution_digest:$resolution_digest,
+                   runner_digest:$runner_digest,toolchain_digest:$toolchain_digest,consumer_executions:0}}
+              ],
+              comparison:{exact_before_after_pair_present:false,
+                build_wall_ms:{before:$build_wall_ms,after:null},test_wall_ms:{before:$test_wall_ms,after:null}},
+              authority_contract:{measurement_source:"DIRECT_COMMAND_RECEIPT",log_parsing_authority:false,
+                source_repository_writes:0,local_test_executions:0,denominator_changes:0}}
+          ' > "$RUNNER_TEMP/execution-observation.json"
+
+      - name: Evaluate fixed-denominator normal, unknown, and refuted cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          denominator=contracts/execution-observation-denominator-v1.json
+          observation="$RUNNER_TEMP/execution-observation.json"
+          resolution="$RUNNER_TEMP/resolved-execution-graph.json"
+          evaluator=scripts/evaluate-execution-observation-v1.sh
+          conformer=scripts/conform-execution-observation-v1.sh
+          zeros=$(printf '0%.0s' {1..64})
+
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$observation" "$resolution" \
+            "$RUNNER_TEMP/normal-a" "$SUBJECT_SHA" normal
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$observation" "$resolution" \
+            "$RUNNER_TEMP/normal-b" "$SUBJECT_SHA" normal
+          diff -qr "$RUNNER_TEMP/normal-a" "$RUNNER_TEMP/normal-b"
+
+          jq '
+            .stages |= map(
+              if .id=="EVIDENCE_BUILD" or .id=="SEMANTIC_TEST" then
+                .status="NOT_EXECUTED" | .wall_ms=null | .result_digest=null |
+                .peak_rss_kib=null | .peak_rss_kib_available=false
+              elif .id=="VERIFIED_TEST_RECEIPT_REUSE" then
+                .status="NOT_EXECUTED" | .wall_ms=null | .result_digest=null |
+                .peak_rss_kib=null | .peak_rss_kib_available=false |
+                .cache={state:"UNKNOWN",key:null,digest:null,authority:"UNKNOWN"} | del(.reuse_receipt)
+              else . end
+            )
+          ' "$observation" > "$RUNNER_TEMP/not-executed-observation.json"
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$RUNNER_TEMP/not-executed-observation.json" "$resolution" \
+            "$RUNNER_TEMP/not-executed" "$SUBJECT_SHA" not-executed
+
+          jq '
+            .stages |= map(if .id=="VERIFIED_TEST_RECEIPT_REUSE" then
+              .status="UNKNOWN" | .wall_ms=null | .result_digest=null |
+              .peak_rss_kib=null | .peak_rss_kib_available=false |
+              .cache={state:"UNKNOWN",key:null,digest:null,authority:"UNKNOWN"} | del(.reuse_receipt)
+            else . end)
+          ' "$observation" > "$RUNNER_TEMP/missing-reuse-observation.json"
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$RUNNER_TEMP/missing-reuse-observation.json" "$resolution" \
+            "$RUNNER_TEMP/missing-reuse" "$SUBJECT_SHA" missing-reuse
+
+          jq --arg digest "$zeros" '
+            .stages |= map(if .id=="VERIFIED_TEST_RECEIPT_REUSE" then .cache.digest=$digest else . end)
+          ' "$observation" > "$RUNNER_TEMP/stale-cache-observation.json"
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$RUNNER_TEMP/stale-cache-observation.json" "$resolution" \
+            "$RUNNER_TEMP/stale-cache" "$SUBJECT_SHA" stale-cache
+
+          jq --arg digest "$zeros" '
+            .stages |= map(
+              if .id=="EVIDENCE_BUILD" or .id=="SEMANTIC_TEST" then
+                .status="NOT_EXECUTED" | .wall_ms=null | .result_digest=null |
+                .peak_rss_kib=null | .peak_rss_kib_available=false
+              elif .id=="VERIFIED_TEST_RECEIPT_REUSE" then
+                .status="NOT_EXECUTED" | .wall_ms=null | .result_digest=null |
+                .peak_rss_kib=null | .peak_rss_kib_available=false | .cache.digest=$digest | del(.reuse_receipt)
+              else . end
+            )
+          ' "$observation" > "$RUNNER_TEMP/mixed-observation.json"
+          bash "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$RUNNER_TEMP/mixed-observation.json" "$resolution" \
+            "$RUNNER_TEMP/mixed" "$SUBJECT_SHA" mixed
+
+          bash "$conformer" "$RUNNER_TEMP/normal-a" "$denominator" "$resolution" normal "$SUBJECT_SHA" "$RUNNER_TEMP/conform-normal.json"
+          bash "$conformer" "$RUNNER_TEMP/normal-b" "$denominator" "$resolution" normal "$SUBJECT_SHA" "$RUNNER_TEMP/conform-normal-replay.json"
+          bash "$conformer" "$RUNNER_TEMP/not-executed" "$denominator" "$resolution" not-executed "$SUBJECT_SHA" "$RUNNER_TEMP/conform-not-executed.json"
+          bash "$conformer" "$RUNNER_TEMP/missing-reuse" "$denominator" "$resolution" missing-reuse "$SUBJECT_SHA" "$RUNNER_TEMP/conform-missing-reuse.json"
+          bash "$conformer" "$RUNNER_TEMP/stale-cache" "$denominator" "$resolution" stale-cache "$SUBJECT_SHA" "$RUNNER_TEMP/conform-stale-cache.json"
+          bash "$conformer" "$RUNNER_TEMP/mixed" "$denominator" "$resolution" mixed "$SUBJECT_SHA" "$RUNNER_TEMP/conform-mixed.json"
+
+      - name: Publish human-readable runtime and graph-linked evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot() {
+            find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -print0 |
+              sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+          }
+          before=$(cat "$RUNNER_TEMP/repository-before")
+          after=$(snapshot)
+          if [ "$before" = "$after" ]; then repository_writes=0; else repository_writes=1; fi
+
+          resolution_digest=$(jq -S -c . "$RUNNER_TEMP/resolved-execution-graph.json" | sha256sum | awk '{print $1}')
+          build_wall_ms=$(jq -r '.stages[]|select(.id=="EVIDENCE_BUILD")|.wall_ms' "$RUNNER_TEMP/execution-observation.json")
+          test_wall_ms=$(jq -r '.stages[]|select(.id=="SEMANTIC_TEST")|.wall_ms' "$RUNNER_TEMP/execution-observation.json")
+          build_rss=$(jq -r '.stages[]|select(.id=="EVIDENCE_BUILD")|.peak_rss_kib' "$RUNNER_TEMP/execution-observation.json")
+          test_rss=$(jq -r '.stages[]|select(.id=="SEMANTIC_TEST")|.peak_rss_kib' "$RUNNER_TEMP/execution-observation.json")
+          artifact_file_count=$(
+            find "$RUNNER_TEMP/normal-a" "$RUNNER_TEMP/normal-b" "$RUNNER_TEMP/not-executed" \
+              "$RUNNER_TEMP/missing-reuse" "$RUNNER_TEMP/stale-cache" "$RUNNER_TEMP/mixed" -type f
+            find "$RUNNER_TEMP" -maxdepth 1 -name 'conform-*.json' -type f
+            printf '%s\n' "$RUNNER_TEMP/execution-observation.json" "$RUNNER_TEMP/resolved-execution-graph.json" \
+              "$RUNNER_TEMP/reuse-receipt.json" "$RUNNER_TEMP/verification-test.json" "$RUNNER_TEMP/runtime.json" 2>/dev/null
+          )
+          artifact_file_count=$(printf '%s\n' "$artifact_file_count" | sed '/^$/d' | wc -l | tr -d ' ')
+
+          jq -S -n \
+            --arg subject_sha "$SUBJECT_SHA" --arg resolution_digest "$resolution_digest" \
+            --argjson build_wall_ms "$build_wall_ms" --argjson test_wall_ms "$test_wall_ms" \
+            --argjson build_rss "$build_rss" --argjson test_rss "$test_rss" \
+            --argjson repository_writes "$repository_writes" --argjson artifact_file_count "$artifact_file_count" \
+            --slurpfile observation "$RUNNER_TEMP/execution-observation.json" \
+            --slurpfile normal "$RUNNER_TEMP/normal-a/evaluation.json" '
+            {schema:"gooo/evidence-generator/execution-observation-runtime/v1",subject_sha:$subject_sha,
+             graph:{role:$observation[0].authority.graph_role,hash:$observation[0].authority.graph_hash,
+               activity_resolution_digest:$resolution_digest},
+             stages:{build:{activity_id:"BUILD_STAGE",activity:"ObserveBuildStage",status:"EXECUTED",wall_ms:$build_wall_ms,peak_rss_kib:$build_rss},
+               test:{activity_id:"TEST_STAGE",activity:"ObserveTestStage",status:"EXECUTED",wall_ms:$test_wall_ms,peak_rss_kib:$test_rss},
+               reused:{activity_id:"REUSED_WORK",activity:"ObserveVerifiedReuse",status:"REUSED",wall_ms:null,peak_rss_kib:null}},
+             reuse:{verified_receipt_reuses:$normal[0].reuse.receipt_reuses,consumer_test_executions:$normal[0].reuse.consumer_test_executions,
+               cache_key:$normal[0].reuse.cache.key,cache_digest:$normal[0].reuse.cache.digest,cache_authority:$normal[0].reuse.cache.authority},
+             improvement:{build_wall_ms:{state:"UNKNOWN",before:$build_wall_ms,after:null,reason:"EQUIVALENT_BEFORE_AFTER_PAIR_ABSENT"},
+               test_wall_ms:{state:"UNKNOWN",before:$test_wall_ms,after:null,reason:"EQUIVALENT_BEFORE_AFTER_PAIR_ABSENT"}},
+             denominator:$normal[0].summary,repository:{before_digest:$before,after_digest:$after,writes:$repository_writes},
+             artifacts:{files:$artifact_file_count},authority:{measurement_source:"DIRECT_COMMAND_RECEIPT",log_parsing_authority:false,
+               source_repository_writes:0,local_test_executions:0,denominator_changes:0}}
+          ' > "$RUNNER_TEMP/runtime.json"
+          jq -e '.repository.writes==0 and .repository.before_digest==.repository.after_digest and
+            .stages.build.wall_ms>=0 and .stages.test.wall_ms>=0 and .stages.reused.wall_ms==null and
+            .reuse.verified_receipt_reuses==1 and .reuse.consumer_test_executions==0 and
+            .improvement.build_wall_ms.state=="UNKNOWN" and .improvement.test_wall_ms.state=="UNKNOWN"' \
+            "$RUNNER_TEMP/runtime.json" >/dev/null
+
+          {
+            echo '## Build, test, and verified reuse observation v1'
+            jq -r '"- released semantic graph: \(.graph.hash); activity-resolution digest: \(.graph.activity_resolution_digest)"' "$RUNNER_TEMP/runtime.json"
+            jq -r '"- evidence build: \(.stages.build.status), \(.stages.build.wall_ms) ms, \(.stages.build.peak_rss_kib) KiB peak RSS"' "$RUNNER_TEMP/runtime.json"
+            jq -r '"- evidence test: \(.stages.test.status), \(.stages.test.wall_ms) ms, \(.stages.test.peak_rss_kib) KiB peak RSS"' "$RUNNER_TEMP/runtime.json"
+            jq -r '"- verified reuse: \(.stages.reused.status), \(.reuse.verified_receipt_reuses)/1 receipt reuse, \(.reuse.consumer_test_executions) consumer tests, cache \(.reuse.cache_key) / \(.reuse.cache_digest) / \(.reuse.cache_authority)"' "$RUNNER_TEMP/runtime.json"
+            jq -r '"- build/test improvement: \(.improvement.build_wall_ms.state) / \(.improvement.test_wall_ms.state) (exact before/after pair absent)"' "$RUNNER_TEMP/runtime.json"
+            jq -r '"- normal evidence cells: \(.denominator.closed) CLOSED / \(.denominator.unknown) UNKNOWN / \(.denominator.refuted) REFUTED; repository writes: \(.repository.writes)"' "$RUNNER_TEMP/runtime.json"
+            jq -r '"- artifact files prepared: \(.artifacts.files)"' "$RUNNER_TEMP/runtime.json"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload execution observation evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: execution-observation-v1-${{ github.event.pull_request.head.sha || github.sha }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/normal-a
+            ${{ runner.temp }}/normal-b
+            ${{ runner.temp }}/not-executed
+            ${{ runner.temp }}/missing-reuse
+            ${{ runner.temp }}/stale-cache
+            ${{ runner.temp }}/mixed
+            ${{ runner.temp }}/conform-*.json
+            ${{ runner.temp }}/execution-observation.json
+            ${{ runner.temp }}/resolved-execution-graph.json
+            ${{ runner.temp }}/reuse-receipt.json
+            ${{ runner.temp }}/verification-test.json
+            ${{ runner.temp }}/runtime.json
+            ${{ runner.temp }}/runner.json
+            ${{ runner.temp }}/toolchain.json
+            ${{ runner.temp }}/input-scope.json

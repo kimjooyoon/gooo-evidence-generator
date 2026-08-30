@@ -1,0 +1,218 @@
+{
+  "cells": [
+    {
+      "activity": "ObserveReleasedExecutionCore",
+      "closed_reason": "RELEASED_EXECUTION_CORE_OBSERVED",
+      "depends_on": [],
+      "id": "RELEASED_EXECUTION_CORE",
+      "indicator_class": "DRIVER",
+      "ordinal": 1,
+      "proof_choice": "FOUNDATION",
+      "stage": "CORE_RELEASE",
+      "step": "OBSERVE_RELEASED_EXECUTION_CORE",
+      "unknown_reason": "RELEASED_EXECUTION_CORE_UNAVAILABLE"
+    },
+    {
+      "activity": "BindExecutionObservationActivities",
+      "closed_reason": "EXECUTION_OBSERVATION_ACTIVITIES_BOUND",
+      "depends_on": [
+        "RELEASED_EXECUTION_CORE"
+      ],
+      "id": "META_ACTIVITY_AUTHORITY",
+      "indicator_class": "DRIVER",
+      "ordinal": 2,
+      "proof_choice": "FOUNDATION",
+      "stage": "AUTHORITY",
+      "step": "BIND_EXECUTION_OBSERVATION_ACTIVITIES",
+      "unknown_reason": "EXECUTION_OBSERVATION_ACTIVITY_AUTHORITY_UNAVAILABLE"
+    },
+    {
+      "activity": "PinRunnerAndToolchain",
+      "closed_reason": "RUNNER_AND_TOOLCHAIN_PINNED",
+      "depends_on": [
+        "RELEASED_EXECUTION_CORE"
+      ],
+      "id": "RUNNER_TOOLCHAIN",
+      "indicator_class": "DRIVER",
+      "ordinal": 3,
+      "proof_choice": "FOUNDATION",
+      "stage": "IDENTITY",
+      "step": "PIN_RUNNER_AND_TOOLCHAIN",
+      "unknown_reason": "RUNNER_OR_TOOLCHAIN_UNAVAILABLE"
+    },
+    {
+      "activity": "PinExecutionInputDigest",
+      "closed_reason": "EXECUTION_INPUT_DIGEST_PINNED",
+      "depends_on": [
+        "RELEASED_EXECUTION_CORE",
+        "RUNNER_TOOLCHAIN"
+      ],
+      "id": "INPUT_DIGEST",
+      "indicator_class": "DRIVER",
+      "ordinal": 4,
+      "proof_choice": "FOUNDATION",
+      "stage": "IDENTITY",
+      "step": "PIN_EXECUTION_INPUT_DIGEST",
+      "unknown_reason": "EXECUTION_INPUT_DIGEST_UNAVAILABLE"
+    },
+    {
+      "activity": "ObserveBuildStage",
+      "closed_reason": "BUILD_STAGE_EXECUTION_OBSERVED",
+      "depends_on": [
+        "INPUT_DIGEST"
+      ],
+      "id": "BUILD_STAGE",
+      "indicator_class": "OUTCOME",
+      "ordinal": 5,
+      "proof_choice": "COHERENCE",
+      "stage": "BUILD",
+      "step": "OBSERVE_BUILD_STAGE",
+      "unknown_reason": "BUILD_STAGE_NOT_EXECUTED"
+    },
+    {
+      "activity": "ObserveTestStage",
+      "closed_reason": "TEST_STAGE_EXECUTION_OBSERVED",
+      "depends_on": [
+        "INPUT_DIGEST"
+      ],
+      "id": "TEST_STAGE",
+      "indicator_class": "OUTCOME",
+      "ordinal": 6,
+      "proof_choice": "COHERENCE",
+      "stage": "TEST",
+      "step": "OBSERVE_TEST_STAGE",
+      "unknown_reason": "TEST_STAGE_NOT_EXECUTED"
+    },
+    {
+      "activity": "ObserveVerifiedReuse",
+      "closed_reason": "VERIFIED_WORK_REUSED",
+      "depends_on": [
+        "TEST_STAGE",
+        "CACHE_IDENTITY"
+      ],
+      "id": "REUSED_WORK",
+      "indicator_class": "OUTCOME",
+      "ordinal": 7,
+      "proof_choice": "COHERENCE",
+      "stage": "REUSE",
+      "step": "OBSERVE_VERIFIED_REUSE",
+      "unknown_reason": "VERIFIED_REUSE_UNAVAILABLE"
+    },
+    {
+      "activity": "VerifyCacheIdentity",
+      "closed_reason": "CACHE_KEY_DIGEST_AND_AUTHORITY_VERIFIED",
+      "depends_on": [
+        "INPUT_DIGEST"
+      ],
+      "id": "CACHE_IDENTITY",
+      "indicator_class": "GUARDRAIL",
+      "ordinal": 8,
+      "proof_choice": "COHERENCE",
+      "stage": "REUSE",
+      "step": "VERIFY_CACHE_IDENTITY",
+      "unknown_reason": "CACHE_IDENTITY_UNAVAILABLE"
+    },
+    {
+      "activity": "PreserveNotExecutedState",
+      "closed_reason": "NOT_EXECUTED_WORK_NOT_COUNTED_AS_SUCCESS",
+      "depends_on": [
+        "BUILD_STAGE",
+        "TEST_STAGE",
+        "REUSED_WORK"
+      ],
+      "id": "NOT_EXECUTED_STATE",
+      "indicator_class": "GUARDRAIL",
+      "ordinal": 9,
+      "proof_choice": "REGRESSION",
+      "stage": "AUTHORITY",
+      "step": "PRESERVE_NOT_EXECUTED_STATE",
+      "unknown_reason": "NOT_EXECUTED_STATE_UNAVAILABLE"
+    },
+    {
+      "activity": "ObservePeakRssAvailability",
+      "closed_reason": "PEAK_RSS_AVAILABILITY_EXPLICIT",
+      "depends_on": [
+        "BUILD_STAGE",
+        "TEST_STAGE",
+        "REUSED_WORK"
+      ],
+      "id": "PEAK_RSS",
+      "indicator_class": "GUARDRAIL",
+      "ordinal": 10,
+      "proof_choice": "REGRESSION",
+      "stage": "RESOURCE",
+      "step": "OBSERVE_PEAK_RSS_AVAILABILITY",
+      "unknown_reason": "PEAK_RSS_AVAILABILITY_UNAVAILABLE"
+    },
+    {
+      "activity": "PreserveBeforeAfterUnknown",
+      "closed_reason": "EXACT_BEFORE_AFTER_BOUNDARY_PRESERVED",
+      "depends_on": [
+        "BUILD_STAGE",
+        "TEST_STAGE",
+        "REUSED_WORK",
+        "NOT_EXECUTED_STATE"
+      ],
+      "id": "IMPROVEMENT_BOUNDARY",
+      "indicator_class": "GUARDRAIL",
+      "ordinal": 11,
+      "proof_choice": "REGRESSION",
+      "stage": "IMPROVEMENT",
+      "step": "PRESERVE_EXACT_BEFORE_AFTER_BOUNDARY",
+      "unknown_reason": "EQUIVALENT_BEFORE_AFTER_PAIR_ABSENT"
+    },
+    {
+      "activity": "PublishExecutionHumanDossier",
+      "closed_reason": "EXECUTION_OBSERVATION_HUMAN_DOSSIER_PUBLISHED",
+      "depends_on": [
+        "META_ACTIVITY_AUTHORITY",
+        "RUNNER_TOOLCHAIN",
+        "INPUT_DIGEST",
+        "BUILD_STAGE",
+        "TEST_STAGE",
+        "REUSED_WORK",
+        "CACHE_IDENTITY",
+        "NOT_EXECUTED_STATE",
+        "PEAK_RSS"
+      ],
+      "id": "HUMAN_DOSSIER",
+      "indicator_class": "OUTCOME",
+      "ordinal": 12,
+      "proof_choice": "REGRESSION",
+      "stage": "REPORT",
+      "step": "PUBLISH_EXECUTION_HUMAN_DOSSIER",
+      "unknown_reason": "EXECUTION_OBSERVATION_REPORT_UNAVAILABLE"
+    }
+  ],
+  "id": "gooo://denominator/execution-observation/v1",
+  "indicator_totals": [
+    {
+      "indicator_class": "DRIVER",
+      "total": 4
+    },
+    {
+      "indicator_class": "OUTCOME",
+      "total": 4
+    },
+    {
+      "indicator_class": "GUARDRAIL",
+      "total": 4
+    }
+  ],
+  "proof_totals": [
+    {
+      "proof_choice": "FOUNDATION",
+      "total": 4
+    },
+    {
+      "proof_choice": "COHERENCE",
+      "total": 4
+    },
+    {
+      "proof_choice": "REGRESSION",
+      "total": 4
+    }
+  ],
+  "schema": "gooo/evidence-generator/execution-observation-denominator/v1",
+  "target_cells": 12
+}
