@@ -1,0 +1,28 @@
+package counterexamplerevision
+namespace counterexamplerevision
+
+entity ReleasedRevisionCore id "gooo://counterexample-guided-revision/entity/released-core"
+entity RevisionActivities id "gooo://counterexample-guided-revision/entity/meta-activities"
+entity InputClaim id "gooo://counterexample-guided-revision/entity/input-claim"
+entity RevisionScope id "gooo://counterexample-guided-revision/entity/revision-scope"
+entity CausalFrontier id "gooo://counterexample-guided-revision/entity/causal-frontier"
+entity RevisionCounterexample id "gooo://counterexample-guided-revision/entity/counterexample"
+entity ResolutionBoundary id "gooo://counterexample-guided-revision/entity/resolution-boundary"
+entity RevisionProposal id "gooo://counterexample-guided-revision/entity/revision-proposal"
+entity RevisionReplayGuard id "gooo://counterexample-guided-revision/entity/replay-guard"
+entity RevisionUnknown id "gooo://counterexample-guided-revision/entity/unknown"
+entity RevisionRefutationPrecedence id "gooo://counterexample-guided-revision/entity/refutation-precedence"
+entity RevisionHumanDossier id "gooo://counterexample-guided-revision/entity/human-dossier"
+
+activity ObserveReleasedRevisionCore(ReleasedRevisionCore) -> RevisionProposal
+activity BindRevisionActivities(RevisionActivities) -> RevisionProposal
+activity ObserveInputClaim(InputClaim) -> RevisionProposal
+activity BoundRevisionScope(RevisionScope) -> RevisionProposal
+activity LocateCausalFrontier(CausalFrontier) -> RevisionProposal
+activity ObserveRevisionCounterexample(RevisionCounterexample) -> RevisionProposal
+activity SelectResolutionBoundary(ResolutionBoundary) -> RevisionProposal
+activity GenerateRevisionProposal(RevisionProposal) -> RevisionProposal
+activity VerifyRevisionReplay(RevisionReplayGuard) -> RevisionProposal
+activity PreserveRevisionUnknown(RevisionUnknown) -> RevisionProposal
+activity PrioritizeRevisionRefutation(RevisionRefutationPrecedence) -> RevisionProposal
+activity PublishRevisionHumanDossier(RevisionHumanDossier) -> RevisionProposal
