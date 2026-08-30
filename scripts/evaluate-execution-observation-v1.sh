@@ -297,14 +297,14 @@ reuse_count=$(jq -r '.reuse.receipt_reuses' "$output_real/evaluation.json")
 cat > "$output_real/report.md" <<EOF
 # Execution observation v1
 
-- scenario: `$scenario`
-- decision: `$decision`
-- evidence-build stage: `$build_status`, `$build_wall_ms` ms
-- semantic-test stage: `$test_status`, `$test_wall_ms` ms
-- verified reuse: `$reuse_status`, `$reuse_count/1` receipt reuse
-- build/test improvement: `UNKNOWN` until an exact before/after pair exists
-- activity authority: released semantic graph `$graph_hash`
-- activity-resolution digest: `$resolution_digest`
+- scenario: $scenario
+- decision: $decision
+- evidence-build stage: $build_status, $build_wall_ms ms
+- semantic-test stage: $test_status, $test_wall_ms ms
+- verified reuse: $reuse_status, $reuse_count/1 receipt reuse
+- build/test improvement: UNKNOWN until an exact before/after pair exists
+- activity authority: released semantic graph $graph_hash
+- activity-resolution digest: $resolution_digest
 EOF
 
 tracked_files=(observation.json evaluation.json report.md)
