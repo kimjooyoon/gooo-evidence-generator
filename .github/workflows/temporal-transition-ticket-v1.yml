@@ -126,7 +126,7 @@ jobs:
             local output=$3
             local report=$4
             bash -x "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$input" "$resolution" "$outputs/$output" "$SUBJECT_SHA" "$name"
-            bash "$conformer" "$outputs/$output" "$denominator" "$ticket" "$input" "$resolution" "$name" "$outputs/$report"
+            bash -x "$conformer" "$outputs/$output" "$denominator" "$ticket" "$input" "$resolution" "$name" "$outputs/$report"
           }
 
           start_ns=$(date +%s%N)
@@ -135,10 +135,10 @@ jobs:
               "$outputs/normal-a" "$SUBJECT_SHA" normal
           end_ns=$(date +%s%N)
           echo $(( (end_ns-start_ns+999999)/1000000 )) > "$RUNNER_TEMP/evaluator-wall-ms"
-          bash "$conformer" "$outputs/normal-a" "$denominator" "$ticket" "$evidence" "$resolution" normal "$outputs/conform-normal-a.json"
+          bash -x "$conformer" "$outputs/normal-a" "$denominator" "$ticket" "$evidence" "$resolution" normal "$outputs/conform-normal-a.json"
           bash -x "$evaluator" "$GITHUB_WORKSPACE" "$denominator" "$ticket" "$evidence" "$resolution" \
             "$outputs/normal-b" "$SUBJECT_SHA" normal
-          bash "$conformer" "$outputs/normal-b" "$denominator" "$ticket" "$evidence" "$resolution" normal "$outputs/conform-normal-b.json"
+          bash -x "$conformer" "$outputs/normal-b" "$denominator" "$ticket" "$evidence" "$resolution" normal "$outputs/conform-normal-b.json"
           diff -qr "$outputs/normal-a" "$outputs/normal-b"
 
           run_case prepared-not-consumed "$scenarios/prepared-not-consumed.json" prepared-not-consumed conform-prepared-not-consumed.json
