@@ -1,0 +1,29 @@
+package testreceiptreuse
+namespace testreceiptreuse
+
+entity ReleasedTestCore id "gooo://test-receipt-reuse/entity/released-core"
+entity TestReceiptReuseActivities id "gooo://test-receipt-reuse/entity/meta-activities"
+entity TestSubjectScope id "gooo://test-receipt-reuse/entity/subject-scope"
+entity BaselineTestExecution id "gooo://test-receipt-reuse/entity/baseline-execution"
+entity ExactTestReceipt id "gooo://test-receipt-reuse/entity/receipt"
+entity TestReceiptIdentity id "gooo://test-receipt-reuse/entity/receipt-identity"
+entity TestScopeEquivalence id "gooo://test-receipt-reuse/entity/scope-equivalence"
+entity ExactTestReceiptReuse id "gooo://test-receipt-reuse/entity/reuse-decision"
+entity ReceiptReuseWithoutConsumerTest id "gooo://test-receipt-reuse/entity/execution-avoidance"
+entity TestReceiptUnknown id "gooo://test-receipt-reuse/entity/unknown"
+entity StaleOrContradictoryReceipt id "gooo://test-receipt-reuse/entity/refutation"
+entity TestReceiptReuseReport id "gooo://test-receipt-reuse/entity/report"
+entity TestReceiptReuseDecision id "gooo://test-receipt-reuse/entity/decision"
+
+activity ObserveReleasedTestCore(ReleasedTestCore) -> TestReceiptReuseDecision
+activity BindTestReceiptReuseActivities(TestReceiptReuseActivities) -> TestReceiptReuseDecision
+activity PinTestSubjectScope(TestSubjectScope) -> TestReceiptReuseDecision
+activity RecordBaselineTestExecution(BaselineTestExecution) -> TestReceiptReuseDecision
+activity PublishExactTestReceipt(ExactTestReceipt) -> TestReceiptReuseDecision
+activity VerifyTestReceiptIdentity(TestReceiptIdentity) -> TestReceiptReuseDecision
+activity CompareTestScopeDigests(TestScopeEquivalence) -> TestReceiptReuseDecision
+activity AuthorizeExactTestReceiptReuse(ExactTestReceiptReuse) -> TestReceiptReuseDecision
+activity RecordReceiptReuseWithoutConsumerTest(ReceiptReuseWithoutConsumerTest) -> TestReceiptReuseDecision
+activity PreserveTestReceiptUnknown(TestReceiptUnknown) -> TestReceiptReuseDecision
+activity RefuteStaleOrContradictoryReceipt(StaleOrContradictoryReceipt) -> TestReceiptReuseDecision
+activity PublishTestReceiptReuseReport(TestReceiptReuseReport) -> TestReceiptReuseDecision

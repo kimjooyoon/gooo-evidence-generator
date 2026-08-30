@@ -119,3 +119,21 @@ This closes one exact fixture pair, not a general language-value claim.
 Independent external adoption remains `0/1 UNKNOWN`, build and test executions
 remain zero, and the repository is never edited by the candidate. See
 [the v1 effect RFC](docs/rfcs/transformation-effect-receipt-v1.md).
+
+## Exact test receipt reuse v1
+
+The next bounded loop distinguishes a test that ran from a test that merely
+looks reusable. CI executes one released-Gooo semantic test, records its exact
+input scope, toolchain, command, result digest, wall time, and peak RSS, then
+asks an independent evaluator whether a consumer may reuse that receipt
+without executing the test again.
+
+Reuse closes only when all scope and result identities match. A missing
+receipt remains UNKNOWN, while stale scope, an unrecognized receipt decision,
+known result contradiction, or authority escalation is REFUTED. A mixed stale
+and incomplete receipt is REFUTED rather than hidden by UNKNOWN.
+
+The normal fixture records one producer test execution, one receipt reuse, and
+zero consumer test executions. Saved test time remains UNKNOWN because this
+experiment does not have an independent equivalent timing pair. See
+[the test receipt reuse RFC](docs/rfcs/test-receipt-reuse-v1.md).

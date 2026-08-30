@@ -1,0 +1,29 @@
+{
+  "schema": "gooo/evidence-generator/test-receipt-reuse-denominator/v1",
+  "id": "gooo://denominator/test-receipt-reuse/v1",
+  "target_cells": 12,
+  "proof_totals": [
+    {"proof_choice": "FOUNDATION", "total": 4},
+    {"proof_choice": "COHERENCE", "total": 4},
+    {"proof_choice": "REGRESSION", "total": 4}
+  ],
+  "indicator_totals": [
+    {"indicator_class": "DRIVER", "total": 4},
+    {"indicator_class": "OUTCOME", "total": 4},
+    {"indicator_class": "GUARDRAIL", "total": 4}
+  ],
+  "cells": [
+    {"ordinal": 1, "id": "RELEASED_GOOO_IDENTITY", "activity": "ObserveReleasedTestCore", "stage": "CORE_RELEASE", "step": "OBSERVE_RELEASED_TEST_CORE", "proof_choice": "FOUNDATION", "indicator_class": "DRIVER", "closed_reason": "RELEASED_TEST_CORE_OBSERVED", "depends_on": []},
+    {"ordinal": 2, "id": "META_ACTIVITY_AUTHORITY", "activity": "BindTestReceiptReuseActivities", "stage": "META_AUTHORITY", "step": "BIND_TEST_RECEIPT_REUSE_ACTIVITIES", "proof_choice": "FOUNDATION", "indicator_class": "GUARDRAIL", "closed_reason": "TEST_RECEIPT_REUSE_ACTIVITIES_BOUND", "depends_on": ["RELEASED_GOOO_IDENTITY"]},
+    {"ordinal": 3, "id": "SUBJECT_SCOPE", "activity": "PinTestSubjectScope", "stage": "SCOPE", "step": "PIN_TEST_SUBJECT_SCOPE", "proof_choice": "FOUNDATION", "indicator_class": "DRIVER", "closed_reason": "TEST_SUBJECT_SCOPE_PINNED", "depends_on": ["RELEASED_GOOO_IDENTITY", "META_ACTIVITY_AUTHORITY"]},
+    {"ordinal": 4, "id": "BASELINE_TEST_EXECUTION", "activity": "RecordBaselineTestExecution", "stage": "EXECUTION", "step": "RECORD_BASELINE_TEST_EXECUTION", "proof_choice": "FOUNDATION", "indicator_class": "OUTCOME", "closed_reason": "BASELINE_TEST_EXECUTION_RECORDED", "depends_on": ["SUBJECT_SCOPE"]},
+    {"ordinal": 5, "id": "TEST_RECEIPT", "activity": "PublishExactTestReceipt", "stage": "RECEIPT", "step": "PUBLISH_EXACT_TEST_RECEIPT", "proof_choice": "COHERENCE", "indicator_class": "DRIVER", "closed_reason": "EXACT_TEST_RECEIPT_PUBLISHED", "depends_on": ["BASELINE_TEST_EXECUTION"]},
+    {"ordinal": 6, "id": "RECEIPT_IDENTITY", "activity": "VerifyTestReceiptIdentity", "stage": "IDENTITY", "step": "VERIFY_TEST_RECEIPT_IDENTITY", "proof_choice": "COHERENCE", "indicator_class": "DRIVER", "closed_reason": "TEST_RECEIPT_IDENTITY_VERIFIED", "depends_on": ["TEST_RECEIPT"]},
+    {"ordinal": 7, "id": "SCOPE_EQUIVALENCE", "activity": "CompareTestScopeDigests", "stage": "EQUIVALENCE", "step": "COMPARE_TEST_SCOPE_DIGESTS", "proof_choice": "COHERENCE", "indicator_class": "OUTCOME", "closed_reason": "TEST_SCOPE_DIGESTS_EQUIVALENT", "depends_on": ["SUBJECT_SCOPE", "RECEIPT_IDENTITY"]},
+    {"ordinal": 8, "id": "REUSE_DECISION", "activity": "AuthorizeExactTestReceiptReuse", "stage": "DECISION", "step": "AUTHORIZE_EXACT_TEST_RECEIPT_REUSE", "proof_choice": "COHERENCE", "indicator_class": "OUTCOME", "closed_reason": "EXACT_TEST_RECEIPT_REUSE_AUTHORIZED", "depends_on": ["SCOPE_EQUIVALENCE"]},
+    {"ordinal": 9, "id": "EXECUTION_AVOIDANCE", "activity": "RecordReceiptReuseWithoutConsumerTest", "stage": "AUTHORITY", "step": "RECORD_RECEIPT_REUSE_WITHOUT_CONSUMER_TEST", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "RECEIPT_REUSED_WITHOUT_CONSUMER_TEST", "depends_on": ["REUSE_DECISION"]},
+    {"ordinal": 10, "id": "UNKNOWN_CAUSALITY", "activity": "PreserveTestReceiptUnknown", "stage": "UNCERTAINTY", "step": "PRESERVE_TEST_RECEIPT_UNKNOWN", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "TEST_RECEIPT_UNKNOWN_CAUSALITY_PRESERVED", "depends_on": ["META_ACTIVITY_AUTHORITY"]},
+    {"ordinal": 11, "id": "REFUTATION_PRECEDENCE", "activity": "RefuteStaleOrContradictoryReceipt", "stage": "REFUTATION", "step": "REFUTE_STALE_OR_CONTRADICTORY_RECEIPT", "proof_choice": "REGRESSION", "indicator_class": "GUARDRAIL", "closed_reason": "TEST_RECEIPT_REFUTATION_PRECEDENCE_PRESERVED", "depends_on": ["META_ACTIVITY_AUTHORITY"]},
+    {"ordinal": 12, "id": "HUMAN_REPORT", "activity": "PublishTestReceiptReuseReport", "stage": "REPORT", "step": "PUBLISH_TEST_RECEIPT_REUSE_REPORT", "proof_choice": "REGRESSION", "indicator_class": "OUTCOME", "closed_reason": "TEST_RECEIPT_REUSE_REPORT_PUBLISHED", "depends_on": ["REUSE_DECISION", "EXECUTION_AVOIDANCE", "UNKNOWN_CAUSALITY", "REFUTATION_PRECEDENCE"]}
+  ]
+}
