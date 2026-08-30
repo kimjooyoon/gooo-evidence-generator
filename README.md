@@ -181,3 +181,25 @@ artifact files, repository writes `0`, local test executions `0`, and required
 cross-project gates `0`; external utility and performance improvement remain
 `UNKNOWN` without independent evidence. See
 [the temporal transition ticket RFC](docs/rfcs/temporal-transition-ticket-v1.md).
+
+## Build, test, and verified reuse observation v1
+
+The execution observation workflow makes the evidence-generator's build and
+test stages visible in the Actions summary with integer wall time and peak RSS
+when available. `BUILD` is the caller-owned evidence bundle materialization;
+`TEST` is the generated-bundle digest verification. They are direct command
+receipts, not values parsed from log text. Each stage and each denominator cell
+is bound to an activity in `examples/execution-observation/main.gooo` through
+the released semantic graph and its activity-resolution digest.
+
+The normal case records one executed build, one executed test, and one
+`REUSED` exact test receipt. The receipt's cache key, digest, authority, input
+digest, runner, toolchain, and released graph identity must match before reuse
+closes. No consumer test is executed for the reused work. Product build/test
+work is explicitly `NOT_APPLICABLE` for this repository, with `wall_ms: null`.
+
+No unexecuted work is represented as `0 ms`; it is `NOT_EXECUTED` or `UNKNOWN`.
+Because this fixture has no exact same-condition before/after pair, build-time
+and test-time improvement remain `UNKNOWN`. The fixed 12-cell denominator is
+preserved across normal, not-executed, missing-reuse, stale-cache, and mixed
+cases, with `REFUTED` taking precedence over `UNKNOWN`.

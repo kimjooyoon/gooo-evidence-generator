@@ -1,0 +1,29 @@
+package executionobservation
+namespace executionobservation
+
+entity ReleasedExecutionCore id "gooo://execution-observation/entity/released-core"
+entity ExecutionObservationActivities id "gooo://execution-observation/entity/meta-activities"
+entity RunnerAndToolchain id "gooo://execution-observation/entity/runner-toolchain"
+entity ExecutionInputDigest id "gooo://execution-observation/entity/input-digest"
+entity BuildStage id "gooo://execution-observation/entity/build-stage"
+entity TestStage id "gooo://execution-observation/entity/test-stage"
+entity VerifiedReuse id "gooo://execution-observation/entity/verified-reuse"
+entity CacheIdentity id "gooo://execution-observation/entity/cache-identity"
+entity NotExecutedState id "gooo://execution-observation/entity/not-executed"
+entity PeakRssAvailability id "gooo://execution-observation/entity/peak-rss"
+entity BeforeAfterBoundary id "gooo://execution-observation/entity/before-after"
+entity ExecutionHumanDossier id "gooo://execution-observation/entity/human-dossier"
+entity ExecutionObservationDecision id "gooo://execution-observation/entity/decision"
+
+activity ObserveReleasedExecutionCore(ReleasedExecutionCore) -> ExecutionObservationDecision
+activity BindExecutionObservationActivities(ExecutionObservationActivities) -> ExecutionObservationDecision
+activity PinRunnerAndToolchain(RunnerAndToolchain) -> ExecutionObservationDecision
+activity PinExecutionInputDigest(ExecutionInputDigest) -> ExecutionObservationDecision
+activity ObserveBuildStage(BuildStage) -> ExecutionObservationDecision
+activity ObserveTestStage(TestStage) -> ExecutionObservationDecision
+activity ObserveVerifiedReuse(VerifiedReuse) -> ExecutionObservationDecision
+activity VerifyCacheIdentity(CacheIdentity) -> ExecutionObservationDecision
+activity PreserveNotExecutedState(NotExecutedState) -> ExecutionObservationDecision
+activity ObservePeakRssAvailability(PeakRssAvailability) -> ExecutionObservationDecision
+activity PreserveBeforeAfterUnknown(BeforeAfterBoundary) -> ExecutionObservationDecision
+activity PublishExecutionHumanDossier(ExecutionHumanDossier) -> ExecutionObservationDecision
