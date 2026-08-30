@@ -16,7 +16,7 @@ scenario=$7
 report=$8
 
 expected_files=(activity-bindings.json causal-frontier.json counterexample.json evaluation.json human-dossier.md manifest.json revision-proposal.json)
-test "$(find "$output" -maxdepth 1 -type f | wc -l | tr -d ' ')" -eq 8
+test "$(find "$output" -maxdepth 1 -type f | wc -l | tr -d ' ')" -eq 7
 for relative_path in "${expected_files[@]}"; do
   test -f "$output/$relative_path"
 done

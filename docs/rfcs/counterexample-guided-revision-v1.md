@@ -62,7 +62,7 @@ CI executes the same evaluator and independent conformer for these cases:
 The normal output is generated twice and compared byte-for-byte. Every output
 contains a revision proposal, causal frontier, counterexample record, and
 human dossier. The manifest covers the six machine-readable/text artifacts;
-the manifest itself makes eight files in the caller-owned output directory.
+the manifest itself makes seven files in the caller-owned output directory.
 
 ## Authority and non-claims
 

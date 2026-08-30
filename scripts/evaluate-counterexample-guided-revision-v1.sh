@@ -384,4 +384,4 @@ jq -S -n --arg subject_sha "$subject_sha" --arg scenario "$scenario" --argjson f
    scenario:$scenario,tracked_file_count:($files|length),files:$files}
 ' > "$output_real/manifest.json"
 
-test "$(find "$output_real" -maxdepth 1 -type f | wc -l | tr -d ' ')" -eq 8
+test "$(find "$output_real" -maxdepth 1 -type f | wc -l | tr -d ' ')" -eq 7

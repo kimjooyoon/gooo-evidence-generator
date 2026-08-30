@@ -207,10 +207,10 @@ jobs:
              cases:{normal:1,unknown:5,refuted:5,normal_replay_runs:2},
              revision:{input_claim_promoted:false,exact_before_after:{state:"UNKNOWN",observed:0,required:1},
                source_mutations:0,repository_writes:0},
-             artifacts:{scenario_outputs:12,scenario_files:96,conformer_reports:12,total:113}}
+             artifacts:{scenario_outputs:12,scenario_files:84,conformer_reports:12,total:102}}
           ' > "$RUNNER_TEMP/runtime.json"
 
-          jq -e '.toolchain.go=="go1.27.0" and .repository.writes==0 and .executions.go_build==0 and .executions.go_test==0 and .executions.local_test==0 and .revision.input_claim_promoted==false and .revision.exact_before_after.state=="UNKNOWN" and .artifacts.total==113' "$RUNNER_TEMP/runtime.json" >/dev/null
+          jq -e '.toolchain.go=="go1.27.0" and .repository.writes==0 and .executions.go_build==0 and .executions.go_test==0 and .executions.local_test==0 and .revision.input_claim_promoted==false and .revision.exact_before_after.state=="UNKNOWN" and .artifacts.total==102' "$RUNNER_TEMP/runtime.json" >/dev/null
           jq -e '.repository.writes==0 and .repository.before_digest==.repository.after_digest' "$RUNNER_TEMP/runtime.json" >/dev/null
 
           artifact_files=$(
@@ -220,7 +220,7 @@ jobs:
             find "$RUNNER_TEMP" -maxdepth 1 -name 'conform-*.json' -type f
             printf '%s\n' "$RUNNER_TEMP/runtime.json" "$RUNNER_TEMP/version.json" "$RUNNER_TEMP/syntax.json" "$RUNNER_TEMP/semantic.json" "$RUNNER_TEMP/graph.json" "$RUNNER_TEMP/resolved-activities.json"
           )
-          test "$(printf '%s\n' "$artifact_files" | sed '/^$/d' | wc -l | tr -d ' ')" -eq 113
+          test "$(printf '%s\n' "$artifact_files" | sed '/^$/d' | wc -l | tr -d ' ')" -eq 102
 
           {
             echo '## Counterexample-guided revision v1'
