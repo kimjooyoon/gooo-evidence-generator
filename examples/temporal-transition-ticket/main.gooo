@@ -1,0 +1,28 @@
+package temporaltransitionticket
+namespace temporaltransitionticket
+
+entity ReleasedTransitionCore id "gooo://temporal-transition-ticket/entity/released-core"
+entity TransitionTicketActivities id "gooo://temporal-transition-ticket/entity/meta-activities"
+entity PredecessorIdentity id "gooo://temporal-transition-ticket/entity/predecessor-identity"
+entity PredecessorArtifactReport id "gooo://temporal-transition-ticket/entity/predecessor-artifact-report"
+entity ProposalTreeExpectation id "gooo://temporal-transition-ticket/entity/proposal-tree-expectation"
+entity TransitionPolicy id "gooo://temporal-transition-ticket/entity/transition-policy"
+entity TicketLifetimeNonce id "gooo://temporal-transition-ticket/entity/ticket-lifetime-nonce"
+entity PredeclaredTransition id "gooo://temporal-transition-ticket/entity/predeclared-transition"
+entity SuccessorMergeReceipt id "gooo://temporal-transition-ticket/entity/successor-merge-receipt"
+entity ConsumeOnceLedger id "gooo://temporal-transition-ticket/entity/consume-once-ledger"
+entity TransitionDecisionPrecedence id "gooo://temporal-transition-ticket/entity/decision-precedence"
+entity TransitionHumanDossier id "gooo://temporal-transition-ticket/entity/human-dossier"
+
+activity ObserveReleasedTransitionCore(ReleasedTransitionCore) -> PredeclaredTransition
+activity BindTransitionTicketActivities(TransitionTicketActivities) -> PredeclaredTransition
+activity DeclarePredecessorIdentity(PredecessorIdentity) -> PredeclaredTransition
+activity BindPredecessorArtifactReport(PredecessorArtifactReport) -> PredeclaredTransition
+activity DeclareProposalTreeExpectation(ProposalTreeExpectation) -> PredeclaredTransition
+activity BindTransitionPolicy(TransitionPolicy) -> PredeclaredTransition
+activity DeclareTicketLifetimeAndNonce(TicketLifetimeNonce) -> PredeclaredTransition
+activity PredeclareTransitionTicket(PredeclaredTransition) -> SuccessorMergeReceipt
+activity ObserveSuccessorMergeReceipt(SuccessorMergeReceipt) -> ConsumeOnceLedger
+activity ConsumeTransitionTicketOnce(ConsumeOnceLedger) -> TransitionDecisionPrecedence
+activity EnforceTransitionDecisionPrecedence(TransitionDecisionPrecedence) -> TransitionHumanDossier
+activity PublishTransitionHumanDossier(TransitionHumanDossier) -> TransitionHumanDossier

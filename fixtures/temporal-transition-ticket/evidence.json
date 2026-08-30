@@ -1,0 +1,77 @@
+{
+  "schema": "gooo/evidence-generator/temporal-transition-ticket/evidence/v1",
+  "upper_decision": "CLOSED",
+  "predecessor": {
+    "identity_state": "CLOSED",
+    "identity": "commit:1111111111111111111111111111111111111111",
+    "artifact_present": true,
+    "artifact_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "observed_artifact_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "report_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "observed_report_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "proposal": {
+    "proposal_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "observed_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "expected_tree_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_branch": "main",
+    "policy_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "toolchain_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "workflow_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+    "expected_proof_choice": "COHERENCE"
+  },
+  "ticket": {
+    "phase": "PREPARED",
+    "prepared": true,
+    "predeclared_before_successor": true,
+    "post_hoc": false,
+    "retroactive_closure_requested": false,
+    "fresh": true,
+    "predeclare": {
+      "predecessor_identity": "commit:1111111111111111111111111111111111111111",
+      "predecessor_artifact_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "predecessor_report_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "proposal_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "expected_tree_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "expected_pr_number": 442,
+      "target_branch": "main",
+      "policy_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "toolchain_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "workflow_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "expected_proof_choice": "COHERENCE",
+      "expiry_policy": "ONE_SUCCESSOR_ATTEMPT",
+      "expires_at": "2099-01-01T00:00:00Z",
+      "nonce": "nonce-temporal-transition-ticket-v1",
+      "ticket_id": "ticket-temporal-transition-v1"
+    }
+  },
+  "consume": {
+    "attempted": true,
+    "reuse": false,
+    "ticket_id": "ticket-temporal-transition-v1",
+    "successor": {
+      "commit_sha": "2222222222222222222222222222222222222222",
+      "tree_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "pr_number": 442,
+      "target_branch": "main",
+      "policy_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "toolchain_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "workflow_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "proof_choice": "COHERENCE",
+      "merge_receipt": {
+        "mapping_type": "SQUASH_COMMIT_TO_EXPECTED_TREE",
+        "typed": true,
+        "commit_sha": "2222222222222222222222222222222222222222",
+        "tree_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    }
+  },
+  "authority": {
+    "repository_writes": 0,
+    "source_mutations": 0,
+    "write_escalation": false,
+    "cross_project_required_gates": 0
+  },
+  "external_utility": {"evidence": 0, "required": 1},
+  "performance": {"improvement_evidence": 0, "required": 1}
+}

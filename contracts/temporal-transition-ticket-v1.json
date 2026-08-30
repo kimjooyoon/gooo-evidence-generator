@@ -1,0 +1,47 @@
+{
+  "schema": "gooo/evidence-generator/temporal-transition-ticket/v1",
+  "phase_order": ["PREDECLARE", "CONSUME_ONCE"],
+  "predeclare_required_fields": [
+    "predecessor_identity",
+    "predecessor_artifact_digest",
+    "predecessor_report_digest",
+    "proposal_digest",
+    "expected_tree_digest",
+    "expected_pr_number",
+    "target_branch",
+    "policy_digest",
+    "toolchain_digest",
+    "workflow_digest",
+    "expected_proof_choice",
+    "expiry_policy",
+    "expires_at",
+    "nonce",
+    "ticket_id"
+  ],
+  "consume_required_fields": [
+    "ticket_id",
+    "successor_commit_sha",
+    "successor_tree_digest",
+    "successor_pr_number",
+    "merge_receipt",
+    "target_branch",
+    "policy_digest",
+    "toolchain_digest",
+    "workflow_digest",
+    "proof_choice"
+  ],
+  "future_commit_mapping": {
+    "mapping_type": "SQUASH_COMMIT_TO_EXPECTED_TREE",
+    "predeclare_field": "expected_tree_digest",
+    "consume_field": "merge_receipt.tree_digest",
+    "commit_sha_predeclared": false,
+    "typed": true
+  },
+  "forbidden": [
+    "POST_HOC_TICKET",
+    "RETROACTIVE_FAILURE_CLOSURE",
+    "TICKET_REUSE",
+    "DIGEST_LAUNDERING",
+    "AUTHORITY_WRITE_ESCALATION"
+  ]
+}
