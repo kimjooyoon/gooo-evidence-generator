@@ -97,20 +97,23 @@ test "$before_unrelated" = "$after_unrelated"
 jq -e --arg before "$before_unrelated" --arg after "$after_unrelated" '.effect.unrelated_before_digest==$before and .effect.unrelated_after_digest==$after and .effect.unrelated_cell_changes==0 and .effect.internal_replay_equal==true' "$receipt" >/dev/null
 
 jq -e --slurpfile denominator "$process_denominator" '
-  .process.summary.total==12 and
-  .process.summary.closed==([.process.cells[]|select(.state=="CLOSED")]|length) and
-  .process.summary.unknown==([.process.cells[]|select(.state=="UNKNOWN")]|length) and
-  .process.summary.refuted==([.process.cells[]|select(.state=="REFUTED")]|length) and
-  all(.process.cells[]|select(.state=="UNKNOWN");
+  . as $receipt |
+  $receipt.process.summary.total==12 and
+  $receipt.process.summary.closed==([$receipt.process.cells[]|select(.state=="CLOSED")]|length) and
+  $receipt.process.summary.unknown==([$receipt.process.cells[]|select(.state=="UNKNOWN")]|length) and
+  $receipt.process.summary.refuted==([$receipt.process.cells[]|select(.state=="REFUTED")]|length) and
+  all($receipt.process.cells[]|select(.state=="UNKNOWN");
     (.stage|type)=="string" and (.step|type)=="string" and (.reason|type)=="string" and
     (.unknown_class|type)=="string" and (.next_operation|type)=="string" and (.blocked_by|type)=="array") and
-  (if .process.summary.refuted>0 then .claim.state=="REFUTED"
-   elif .process.summary.unknown>0 then .claim.state=="UNKNOWN"
-   else .claim.state=="CLOSED" end) and
-  all($denominator[0].proof_totals[] as $proof;
-    ([.process.cells[]|select(.proof_choice==$proof.proof_choice)]|length)==$proof.total) and
-  all($denominator[0].indicator_totals[] as $indicator;
-    ([.process.cells[]|select(.indicator_class==$indicator.indicator_class)]|length)==$indicator.total)
+  (if $receipt.process.summary.refuted>0 then $receipt.claim.state=="REFUTED"
+   elif $receipt.process.summary.unknown>0 then $receipt.claim.state=="UNKNOWN"
+   else $receipt.claim.state=="CLOSED" end) and
+  all($denominator[0].proof_totals[];
+    . as $proof |
+    ([$receipt.process.cells[]|select(.proof_choice==$proof.proof_choice)]|length)==$proof.total) and
+  all($denominator[0].indicator_totals[];
+    . as $indicator |
+    ([$receipt.process.cells[]|select(.indicator_class==$indicator.indicator_class)]|length)==$indicator.total)
 ' "$receipt" >/dev/null
 
 case "$scenario" in
@@ -148,10 +151,11 @@ case "$scenario" in
     ;;
   refuted-over-unknown)
     jq -e '
+      . as $receipt |
       .decision=="FAIL_CLOSED" and
       .process.summary=={total:12,closed:4,unknown:2,refuted:6,direct_missing:1,dependency_blocked:1} and
       .claim.state=="REFUTED" and .claim.reason=="BASELINE_COUNTEREXAMPLE_PRESENT" and
-      .process.cells[]|select(.id=="PATTERN_OBSERVATION")|.state=="UNKNOWN"
+      ([$receipt.process.cells[]|select(.id=="PATTERN_OBSERVATION" and .state=="UNKNOWN")]|length)==1
     ' "$receipt" >/dev/null
     cmp -s "$output/before-project.json" "$output/after-project.json"
     ;;
