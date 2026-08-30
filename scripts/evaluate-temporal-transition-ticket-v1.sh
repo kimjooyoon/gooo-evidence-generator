@@ -436,7 +436,7 @@ jq -S -n \
     bindings:[$resolution[0].activity_resolution_observation.entries[]|{ordinal,id,activity,receipt:.receipt}]}' \
   > "$output_real/activity-bindings.json"
 
-jq -S --arg subject_sha "$subject_sha" --arg scenario "$scenario" \
+jq -S -n --arg subject_sha "$subject_sha" --arg scenario "$scenario" \
   --arg denominator_digest "$denominator_digest" --arg ticket_contract_digest "$ticket_contract_digest" \
   --arg evidence_digest "$evidence_digest" --arg activity_resolution_digest "$activity_resolution_digest" \
   --slurpfile evaluation "$temporary/evaluation.json" \
