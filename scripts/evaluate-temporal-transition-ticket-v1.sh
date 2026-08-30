@@ -100,6 +100,7 @@ fi
 
 upper_decision=$(value '.upper_decision')
 identity_state=$(value '.predecessor.identity_state')
+predecessor_identity=$(value '.predecessor.identity')
 artifact_present=$(value '.predecessor.artifact_present')
 artifact_digest=$(value '.predecessor.artifact_digest')
 observed_artifact_digest=$(value '.predecessor.observed_artifact_digest')
